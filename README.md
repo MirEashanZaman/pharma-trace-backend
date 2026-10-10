@@ -46,9 +46,13 @@ pharma-trace-backend/
 npm install
 ```
 
-### 2. Compile Smart Contracts
+### 2. Compile & Deploy Smart Contracts
 ```bash
-node scripts/compile.js
+# 1. Compile Solidity Contracts
+npm run compile:contract
+
+# 2. Deploy to local EVM / Hardhat / Testnet
+npm run deploy:contract
 ```
 
 ### 3. Build & Run
