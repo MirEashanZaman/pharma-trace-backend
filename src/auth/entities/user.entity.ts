@@ -12,6 +12,7 @@ export enum UserRole {
     DISTRIBUTOR = 'DISTRIBUTOR',
     PHARMACY = 'PHARMACY',
     REGULATOR = 'REGULATOR',
+    CUSTOMER = 'CUSTOMER',
 }
 
 @Entity('users')
