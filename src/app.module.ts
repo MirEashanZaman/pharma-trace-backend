@@ -9,6 +9,7 @@ import { DrugEventsModule } from './events/drug-events.module';
 import { IotModule } from './iot/iot.module';
 import { LedgerModule } from './ledger/ledger.module';
 import { BlockchainModule } from './blockchain/blockchain.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
     IotModule,
     LedgerModule,
     BlockchainModule,
+    AuthModule,
   ],
 
   controllers: [
