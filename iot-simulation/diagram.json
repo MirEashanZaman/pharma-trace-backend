@@ -1,0 +1,66 @@
+{
+    "version": 1,
+    "author": "Eshan Zaman",
+    "editor": "wokwi",
+    "parts": [
+        {
+            "type": "board-esp32-devkit-c-v4",
+            "id": "esp",
+            "top": -211.2,
+            "left": 81.64,
+            "attrs": {}
+        },
+        {
+            "type": "wokwi-dht22",
+            "id": "dht1",
+            "top": -179.4,
+            "left": 277.5,
+            "rotate": 90,
+            "attrs": {
+                "temperature": "12.1"
+            }
+        }
+    ],
+    "connections": [
+        [
+            "esp:TX",
+            "$serialMonitor:RX",
+            "",
+            []
+        ],
+        [
+            "esp:RX",
+            "$serialMonitor:TX",
+            "",
+            []
+        ],
+        [
+            "dht1:VCC",
+            "esp:3V3",
+            "red",
+            [
+                "h-19.2",
+                "v-48"
+            ]
+        ],
+        [
+            "dht1:SDA",
+            "esp:15",
+            "green",
+            [
+                "h-9.6",
+                "v86.5"
+            ]
+        ],
+        [
+            "dht1:GND",
+            "esp:GND.1",
+            "black",
+            [
+                "h-28.8",
+                "v48"
+            ]
+        ]
+    ],
+    "dependencies": {}
+}
