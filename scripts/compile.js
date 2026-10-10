@@ -52,4 +52,4 @@ fs.writeFileSync(
   JSON.stringify(artifact, null, 2)
 );
 
-console.log('✅ Contract compiled successfully -> src/blockchain/artifacts/PharmaTraceAttestation.json');
+console.log(' Contract compiled successfully -> src/blockchain/artifacts/PharmaTraceAttestation.json');

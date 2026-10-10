@@ -12,7 +12,7 @@ export class BlockchainService implements OnModuleInit {
     private contract: ethers.Contract | null = null;
     private contractAddress: string = process.env.BLOCKCHAIN_CONTRACT_ADDRESS || '';
 
-    // In-memory fallback and local mirror for high-speed CQRS queries
+    
     private readonly localAttestations: Map<string, AttestationAnchor> = new Map();
     private readonly drugHistoryIndex: Map<string, string[]> = new Map();
 
@@ -37,10 +37,10 @@ export class BlockchainService implements OnModuleInit {
 
                 if (this.contractAddress && this.wallet) {
                     this.contract = new ethers.Contract(this.contractAddress, artifact.abi, this.wallet);
-                    this.logger.log(`🔗 Connected to Blockchain Attestation Contract at ${this.contractAddress}`);
+                    this.logger.log(` Connected to Blockchain Attestation Contract at ${this.contractAddress}`);
                 } else {
                     this.logger.warn(
-                        '⚡ Blockchain contract address or private key not specified. Operating in hybrid / self-anchoring mode.'
+                        ' Blockchain contract address or private key not specified. Operating in hybrid / self-anchoring mode.'
                     );
                 }
             }
@@ -49,9 +49,7 @@ export class BlockchainService implements OnModuleInit {
         }
     }
 
-    /**
-     * Format a string hash into a 32-byte hexadecimal representation for Solidity bytes32
-     */
+    
     private formatBytes32(hash: string): string {
         if (hash.startsWith('0x') && hash.length === 66) {
             return hash;
@@ -60,9 +58,7 @@ export class BlockchainService implements OnModuleInit {
         return '0x' + clean.padEnd(64, '0').slice(0, 64);
     }
 
-    /**
-     * Anchor an attestation on-chain (or in hybrid ledger)
-     */
+    
     async anchorAttestation(
         dataHash: string,
         drugSerialNumber: string,
@@ -74,7 +70,7 @@ export class BlockchainService implements OnModuleInit {
         let txHash: string | undefined;
         let blockNumber: number | undefined;
 
-        // Try on-chain anchoring if smart contract is active
+        
         if (this.contract) {
             try {
                 const tx = await this.contract.registerAttestation(
@@ -86,7 +82,7 @@ export class BlockchainService implements OnModuleInit {
                 const receipt = await tx.wait();
                 txHash = receipt.hash;
                 blockNumber = receipt.blockNumber;
-                this.logger.log(`⚓ Anchored attestation on-chain: ${txHash}`);
+                this.logger.log(` Anchored attestation on-chain: ${txHash}`);
             } catch (err: any) {
                 this.logger.error(`Failed to register on-chain attestation: ${err.message}`);
             }
@@ -112,9 +108,7 @@ export class BlockchainService implements OnModuleInit {
         return anchor;
     }
 
-    /**
-     * Verify an attestation from the smart contract or local anchor store
-     */
+    
     async verifyAttestation(dataHash: string): Promise<VerifyAttestationResult> {
         const bytes32Hash = this.formatBytes32(dataHash);
 
@@ -164,17 +158,13 @@ export class BlockchainService implements OnModuleInit {
         };
     }
 
-    /**
-     * Get all attestation records for a given drug
-     */
+    
     getDrugAttestations(drugSerialNumber: string): AttestationAnchor[] {
         const hashes = this.drugHistoryIndex.get(drugSerialNumber) || [];
         return hashes.map((h) => this.localAttestations.get(h)!).filter(Boolean);
     }
 
-    /**
-     * Simulate tamper / dispute injection for evaluation testing
-     */
+    
     tamperAttestation(dataHash: string): boolean {
         const bytes32Hash = this.formatBytes32(dataHash);
         const record = this.localAttestations.get(bytes32Hash);
@@ -183,9 +173,7 @@ export class BlockchainService implements OnModuleInit {
         return true;
     }
 
-    /**
-     * Verify cryptographically signed message from a Web3 wallet (MetaMask / EIP-191 / EIP-712)
-     */
+    
     verifyWalletSignature(message: string, signature: string, expectedAddress: string): boolean {
         try {
             const recoveredAddress = ethers.verifyMessage(message, signature);

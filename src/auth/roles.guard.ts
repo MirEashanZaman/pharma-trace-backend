@@ -22,7 +22,7 @@ export class RolesGuard implements CanActivate {
             throw new ForbiddenException('User authentication required for role verification');
         }
 
-        // Admin has universal override privileges
+        
         if (user.role === UserRole.ADMIN) {
             return true;
         }

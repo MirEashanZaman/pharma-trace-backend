@@ -4,7 +4,7 @@ PharmaTrace-ES is an event-driven pharmaceutical supply chain tracking and attes
 
 ---
 
-## 🏛️ Architecture & Features
+##  Architecture & Features
 
 * **Event Sourcing & CQRS**: Segregates lifecycle event commands from trace queries.
 * **Saga Custody Validation**: Orchestrates and enforces valid lifecycle transitions (e.g. `MANUFACTURED` -> `QUALITY_CHECKED` -> `PACKAGED` -> `SHIPPED` -> `RECEIVED` -> `DISTRIBUTED`).
@@ -14,7 +14,7 @@ PharmaTrace-ES is an event-driven pharmaceutical supply chain tracking and attes
 
 ---
 
-## 📁 Folder Structure
+##  Folder Structure
 
 ```text
 pharma-trace-backend/
@@ -39,7 +39,7 @@ pharma-trace-backend/
 
 ---
 
-## 🚀 Setup & Execution
+##  Setup & Execution
 
 ### 1. Install Dependencies
 ```bash

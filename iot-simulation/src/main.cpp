@@ -81,7 +81,7 @@ void loop()
 
   if (data.temperature < MIN_TEMP || data.temperature > MAX_TEMP)
   {
-    Serial.println("⚠️ ALERT: Temperature threshold exceeded!");
+    Serial.println(" ALERT: Temperature threshold exceeded!");
   }
 
   Serial.println("-------------------------");

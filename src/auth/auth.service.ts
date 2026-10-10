@@ -21,9 +21,7 @@ export class AuthService {
         private readonly blockchainService: BlockchainService,
     ) {}
 
-    /**
-     * Standard email/password user registration
-     */
+    
     async register(dto: RegisterDto) {
         const existing = await this.userRepository.findOne({
             where: { email: dto.email },
@@ -42,9 +40,7 @@ export class AuthService {
         return this.generateToken(saved);
     }
 
-    /**
-     * Standard email/password login
-     */
+    
     async login(dto: LoginDto) {
         const user = await this.userRepository.findOne({
             where: { email: dto.email },
@@ -61,9 +57,7 @@ export class AuthService {
         return this.generateToken(user);
     }
 
-    /**
-     * Web3 Wallet-Signature Authentication (MetaMask / EIP-191)
-     */
+    
     async web3Login(dto: Web3LoginDto) {
         const isValid = this.blockchainService.verifyWalletSignature(
             dto.message,
@@ -80,7 +74,7 @@ export class AuthService {
         });
 
         if (!user) {
-            // Auto-provision user account for first-time wallet signers
+            
             user = this.userRepository.create({
                 email: `${dto.walletAddress.toLowerCase().slice(0, 10)}@wallet.pharma`,
                 walletAddress: dto.walletAddress.toLowerCase(),
@@ -93,9 +87,7 @@ export class AuthService {
         return this.generateToken(user);
     }
 
-    /**
-     * Get current user profile
-     */
+    
     async getProfile(userId: number) {
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user) {

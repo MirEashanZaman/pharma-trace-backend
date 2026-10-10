@@ -9,7 +9,7 @@ import { UserRole } from '../../auth/entities/user.entity';
 
 @Injectable()
 export class CustodyTransferSaga {
-    // Map of lifecycle event types to the authorized supply chain role(s)
+    
     private readonly roleAuthorizations: Record<EventType, UserRole[]> = {
         [EventType.MANUFACTURED]: [UserRole.MANUFACTURER, UserRole.ADMIN],
         [EventType.QUALITY_CHECKED]: [UserRole.MANUFACTURER, UserRole.REGULATOR, UserRole.ADMIN],
@@ -32,7 +32,7 @@ export class CustodyTransferSaga {
         nextEvent: EventType,
         userRole?: UserRole | string,
     ): void {
-        // 1. RBAC Verification
+        
         if (userRole) {
             const normalizedRole = userRole as UserRole;
             const allowedRoles = this.roleAuthorizations[nextEvent] || [];
@@ -50,7 +50,7 @@ export class CustodyTransferSaga {
             }
         }
 
-        // 2. Telemetry and Genesis bypass
+        
         if (
             nextEvent === EventType.TEMPERATURE_MONITORED ||
             previousEvent === EventType.TEMPERATURE_MONITORED
@@ -62,7 +62,7 @@ export class CustodyTransferSaga {
             return;
         }
 
-        // 3. State Machine Transition Verification
+        
         const allowedTransitions: Partial<
             Record<EventType, EventType[]>
         > = {
