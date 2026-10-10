@@ -49,15 +49,17 @@ export class DrugEventsService {
 
     async executeCreateCommand(
         data: CreateDrugEventDto,
+        userRole?: string,
     ) {
         const command =
             new CreateDrugEventCommand(data);
 
-        return this.create(command.data);
+        return this.create(command.data, userRole);
     }
 
     async create(
         data: CreateDrugEventDto,
+        userRole?: string,
     ) {
         const drug =
             await this.drugRepository.findOne({
@@ -90,9 +92,15 @@ export class DrugEventsService {
                 ? previousEventRecord.eventType
                 : null;
 
+        const roleToValidate =
+            userRole ||
+            (data.eventData && (data.eventData as any).userRole) ||
+            undefined;
+
         this.custodyTransferSaga.validateTransition(
             previousEvent,
             data.eventType,
+            roleToValidate,
         );
 
         const event =

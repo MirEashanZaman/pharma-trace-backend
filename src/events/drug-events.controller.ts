@@ -5,6 +5,7 @@ import {
     Get,
     Param,
     Post,
+    Req,
 } from '@nestjs/common';
 
 import { DrugEventsService } from './drug-events.service';
@@ -20,9 +21,12 @@ export class DrugEventsController {
     @Post()
     create(
         @Body() body: CreateDrugEventDto,
+        @Req() req?: any,
     ) {
+        const userRole = req?.user?.role;
         return this.drugEventsService.executeCreateCommand(
             body,
+            userRole,
         );
     }
 
