@@ -70,6 +70,14 @@ async function seed() {
             organization: 'Food and Drug Administration',
             walletAddress: '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
         },
+        {
+            email: 'customer@pharma.com',
+            password: defaultPassword,
+            fullName: 'John Patient / Consumer',
+            role: UserRole.CUSTOMER,
+            organization: 'Public Consumer / Patient',
+            walletAddress: '0xcd3b766cc5027d11055150d60447de35e1008473',
+        },
     ];
 
     for (const u of usersToSeed) {
