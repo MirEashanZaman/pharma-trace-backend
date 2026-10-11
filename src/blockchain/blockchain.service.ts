@@ -134,6 +134,7 @@ export class BlockchainService implements OnModuleInit {
 
         const local = this.localAttestations.get(bytes32Hash);
         if (local) {
+            const explorerBase = process.env.BLOCKCHAIN_EXPLORER_URL || 'https://sepolia.etherscan.io/tx/';
             return {
                 exists: true,
                 isValid: !local.isRevoked,
@@ -143,6 +144,8 @@ export class BlockchainService implements OnModuleInit {
                 timestamp: local.timestamp,
                 metadataUri: local.metadataUri || '',
                 onChain: !!local.transactionHash,
+                transactionHash: local.transactionHash,
+                explorerUrl: local.transactionHash ? `${explorerBase}${local.transactionHash}` : undefined,
             };
         }
 

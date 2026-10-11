@@ -19,4 +19,6 @@ export interface VerifyAttestationResult {
     timestamp: number;
     metadataUri: string;
     onChain: boolean;
+    transactionHash?: string;
+    explorerUrl?: string;
 }
