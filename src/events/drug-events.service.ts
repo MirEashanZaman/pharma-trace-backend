@@ -12,6 +12,7 @@ import { DrugEvent } from './entities/drug-event.entity';
 import { Drug } from '../drugs/entities/drug.entity';
 
 import { CreateDrugEventDto } from './dto/create-drug-event.dto';
+import { EventType } from './event-type.enum';
 
 import { EventPublisher } from './publishers/event.publisher';
 
@@ -102,6 +103,10 @@ export class DrugEventsService {
             data.eventType,
             roleToValidate,
         );
+
+        if (data.eventType === EventType.SOLD) {
+            this.custodyTransferSaga.validateMultiSignatureDispensing(data.eventData);
+        }
 
         const event =
             this.drugEventRepository.create({

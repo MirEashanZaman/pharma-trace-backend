@@ -49,4 +49,21 @@ describe('CustodyTransferSaga RBAC & Lifecycle Transitions', () => {
             )
         ).toThrow(BadRequestException);
     });
+
+    it('should require dual doctor and pharmacist multi-signatures for SOLD event', () => {
+        expect(() =>
+            saga.validateMultiSignatureDispensing(undefined)
+        ).toThrow(BadRequestException);
+
+        expect(() =>
+            saga.validateMultiSignatureDispensing({ doctorSignature: '0xabc' })
+        ).toThrow(BadRequestException);
+
+        expect(() =>
+            saga.validateMultiSignatureDispensing({
+                doctorSignature: '0xabc123',
+                pharmacistSignature: '0xdef456',
+            })
+        ).not.toThrow();
+    });
 });

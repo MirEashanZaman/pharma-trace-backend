@@ -101,4 +101,17 @@ export class CustodyTransferSaga {
             );
         }
     }
+
+    validateMultiSignatureDispensing(eventData?: Record<string, any>): void {
+        if (!eventData) {
+            throw new BadRequestException('Multi-signature dispensing requires doctor prescription and pharmacist approval signatures');
+        }
+
+        const { doctorSignature, pharmacistSignature } = eventData;
+        if (!doctorSignature || !pharmacistSignature) {
+            throw new BadRequestException(
+                'Narcotics and high-value dispensing requires dual 2-of-2 multi-signature approval: doctorSignature and pharmacistSignature are mandatory'
+            );
+        }
+    }
 }
