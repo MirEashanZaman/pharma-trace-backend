@@ -1,6 +1,7 @@
 # compiled output
 /dist
 /node_modules
+/build
 
 # Logs
 logs
@@ -8,22 +9,44 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 lerna-debug.log*
 
 # OS
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # IDEs
 .idea
 .vscode
 *.sublime-workspace
+*.sw?
 
 # Environment
 .env
 .env.local
+.env.development
+.env.test
 .env.production
+.env.*.local
+!.env.example
 
 # Hardhat & Solidity
 /cache
 /artifacts
+/typechain
+/typechain-types
+
+# Testing
+/coverage
+/.nyc_output
+
+# Temp & Runtime
+pids
+*.pid
+*.seed
+*.pid.lock
+.temp
+.tmp
