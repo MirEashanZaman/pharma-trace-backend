@@ -17,6 +17,7 @@ import { TemperatureMonitoredStrategy } from './strategies/temperature-monitored
 import { EventStrategyFactory } from './strategies/event-strategy.factory';
 
 import { CustodyTransferSaga } from './saga/custody-transfer.saga';
+import { CustodyRollbackEngine } from './saga/custody-rollback.engine';
 
 import { LedgerModule } from '../ledger/ledger.module';
 import { BlockchainModule } from '../blockchain/blockchain.module';
@@ -51,10 +52,12 @@ import { BlockchainModule } from '../blockchain/blockchain.module';
         EventStrategyFactory,
 
         CustodyTransferSaga,
+        CustodyRollbackEngine,
     ],
 
     exports: [
         DrugEventsService,
+        CustodyRollbackEngine,
     ],
 })
 export class DrugEventsModule { }
