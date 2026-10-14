@@ -25,6 +25,8 @@ export class CustodyTransferSaga {
             UserRole.REGULATOR,
             UserRole.ADMIN,
         ],
+        [EventType.RECALLED]: [UserRole.REGULATOR, UserRole.MANUFACTURER, UserRole.ADMIN],
+        [EventType.QUARANTINED]: [UserRole.REGULATOR, UserRole.MANUFACTURER, UserRole.ADMIN],
     };
 
     validateTransition(
@@ -32,7 +34,6 @@ export class CustodyTransferSaga {
         nextEvent: EventType,
         userRole?: UserRole | string,
     ): void {
-        
         if (userRole) {
             const normalizedRole = userRole as UserRole;
             const allowedRoles = this.roleAuthorizations[nextEvent] || [];
@@ -50,7 +51,22 @@ export class CustodyTransferSaga {
             }
         }
 
-        
+        if (
+            previousEvent === EventType.RECALLED ||
+            previousEvent === EventType.QUARANTINED
+        ) {
+            throw new ForbiddenException(
+                `Drug batch is under active ${previousEvent} status. All custody transfers are strictly suspended by regulatory order.`
+            );
+        }
+
+        if (
+            nextEvent === EventType.RECALLED ||
+            nextEvent === EventType.QUARANTINED
+        ) {
+            return;
+        }
+
         if (
             nextEvent === EventType.TEMPERATURE_MONITORED ||
             previousEvent === EventType.TEMPERATURE_MONITORED

@@ -66,4 +66,42 @@ describe('CustodyTransferSaga RBAC & Lifecycle Transitions', () => {
             })
         ).not.toThrow();
     });
+
+    it('should allow REGULATOR to issue emergency RECALLED at any stage', () => {
+        expect(() =>
+            saga.validateTransition(
+                EventType.SHIPPED,
+                EventType.RECALLED,
+                UserRole.REGULATOR
+            )
+        ).not.toThrow();
+    });
+
+    it('should reject emergency RECALLED if attempted by unauthorized role (e.g. CUSTOMER or DISTRIBUTOR)', () => {
+        expect(() =>
+            saga.validateTransition(
+                EventType.SHIPPED,
+                EventType.RECALLED,
+                UserRole.DISTRIBUTOR
+            )
+        ).toThrow(ForbiddenException);
+    });
+
+    it('should enforce circuit breaker: block any further custody transfers once a batch is RECALLED', () => {
+        expect(() =>
+            saga.validateTransition(
+                EventType.RECALLED,
+                EventType.SOLD,
+                UserRole.PHARMACY
+            )
+        ).toThrow(ForbiddenException);
+
+        expect(() =>
+            saga.validateTransition(
+                EventType.RECALLED,
+                EventType.SHIPPED,
+                UserRole.ADMIN
+            )
+        ).toThrow(ForbiddenException);
+    });
 });
