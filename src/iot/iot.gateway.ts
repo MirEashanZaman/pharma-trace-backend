@@ -42,10 +42,40 @@ export class IotGateway
         humidity: number;
         timestamp: string;
         isExcursion?: boolean;
+        location?: string;
     }) {
         if (this.server) {
             this.server.emit('telemetryUpdate', data);
         }
+    }
+
+    @SubscribeMessage('simulateTelemetry')
+    handleSimulateTelemetry(
+        client: Socket,
+        payload: {
+            serialNumber?: string;
+            temperature: number;
+            humidity: number;
+            isExcursion?: boolean;
+            location?: string;
+        },
+    ) {
+        const isExcursion =
+            payload.isExcursion !== undefined
+                ? payload.isExcursion
+                : payload.temperature < 2 || payload.temperature > 8;
+
+        const broadcastData = {
+            serialNumber: payload.serialNumber || 'RX-994821',
+            temperature: Number(payload.temperature),
+            humidity: Number(payload.humidity),
+            timestamp: new Date().toISOString(),
+            isExcursion,
+            location: payload.location || 'Cold-Chain Mobile Reefer Unit',
+        };
+
+        this.broadcastTelemetry(broadcastData);
+        return { event: 'simulationAcknowledged', data: broadcastData };
     }
 
     @SubscribeMessage('pingTelemetry')
