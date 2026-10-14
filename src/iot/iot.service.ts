@@ -75,4 +75,24 @@ export class IotService {
 
         return event;
     }
+
+    simulateTelemetry(data: {
+        serialNumber?: string;
+        temperature: number;
+        humidity: number;
+        location?: string;
+    }) {
+        const isExcursion = data.temperature < 2 || data.temperature > 8;
+        const telemetry = {
+            serialNumber: data.serialNumber || 'RX-994821',
+            temperature: Number(data.temperature),
+            humidity: Number(data.humidity),
+            timestamp: new Date().toISOString(),
+            isExcursion,
+            location: data.location || 'Cold-Chain Mobile Reefer Unit',
+        };
+
+        this.iotGateway.broadcastTelemetry(telemetry);
+        return telemetry;
+    }
 }
