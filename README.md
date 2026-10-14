@@ -28,6 +28,8 @@ PharmaTrace-ES implements real-world enterprise design patterns directly within 
 | **Circuit Breaker** | Resilience | `src/iot/circuit-breaker/cold-chain.circuit-breaker.ts` | Monitors cold-chain threshold compliance (2°C - 8°C); transitions between `CLOSED`, `OPEN`, and `HALF_OPEN` to halt shipments upon consecutive temperature breaches. |
 | **Observer** | Behavioral | `src/events/observers/audit.observer.ts`<br>`src/iot/iot.gateway.ts` | Decouples event generation from asynchronous notification subscribers, audit loggers, and WebSocket live cartography broadcasts. |
 | **Saga** | Architectural | `src/events/saga/custody-transfer.saga.ts` | Orchestrates distributed custody transitions across supply chain roles (Manufacturer, Distributor, Pharmacy) with compensatory rollback on invalid handovers. |
+| **Compensating Rollback** | Resilience / Saga | `src/events/saga/custody-rollback.engine.ts` | Reverses invalid forward custody transitions into compensatory regulatory states (`QUARANTINED`, `RETURN_TO_MANUFACTURER`, `REVERT_TO_DISTRIBUTED`) with full audit provenance. |
+| **Load Balancer** | Scalability / Resiliency | `src/blockchain/load-balancer/rpc-load-balancer.ts` | Multi-node Web3 RPC traffic distribution and failover across local and testnet nodes supporting `ROUND_ROBIN`, `LEAST_CONNECTIONS`, and `PRIORITY_FAILOVER` strategies with circuit-style node health tracking. |
 | **Singleton** | Creational | NestJS IoC Dependency Injection | Services (`@Injectable()`) are managed as thread-safe singletons across the entire application runtime. |
 
 All design patterns are verified with automated unit tests in `src/patterns.spec.ts`.
