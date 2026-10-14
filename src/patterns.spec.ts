@@ -222,9 +222,9 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             const spy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
             observer.update({
-                type: 'DRUG_CUSTODY_TRANSFERRED',
-                serialNumber: 'SN-2026-AMOX500',
-            });
+                eventType: EventType.MANUFACTURED,
+                drugSerialNumber: 'SN-2026-AMOX500',
+            } as any);
 
             expect(spy).toHaveBeenCalled();
             spy.mockRestore();
