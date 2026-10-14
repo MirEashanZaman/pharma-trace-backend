@@ -81,8 +81,9 @@ export class RpcLoadBalancer {
         });
     }
 
-    selectNode(strategy: LoadBalanceStrategy = 'ROUND_ROBIN'): IRpcNode {
-        const healthyNodes = this.nodes.filter((n) => n.isHealthy);
+    selectNode(strategy: LoadBalanceStrategy = 'ROUND_ROBIN', candidates?: IRpcNode[]): IRpcNode {
+        const pool = candidates || this.nodes;
+        const healthyNodes = pool.filter((n) => n.isHealthy);
         if (healthyNodes.length === 0) {
             this.logger.warn('All RPC nodes marked unhealthy. Emergency recovery probe triggered on primary.');
             this.nodes[0].isHealthy = true;
@@ -115,10 +116,15 @@ export class RpcLoadBalancer {
         maxRetries: number = 3,
     ): Promise<{ result: T; servedBy: IRpcNode }> {
         let lastError: Error | null = null;
+        const triedNodeIds = new Set<string>();
         const attempts = Math.min(maxRetries, this.nodes.length);
 
         for (let i = 0; i < attempts; i++) {
-            const node = this.selectNode(strategy);
+            const remaining = this.nodes.filter((n) => !triedNodeIds.has(n.id) && n.isHealthy);
+            if (remaining.length === 0) break;
+
+            const node = this.selectNode(strategy, remaining);
+            triedNodeIds.add(node.id);
             node.activeRequests++;
             node.totalRequests++;
             const start = Date.now();
