@@ -143,9 +143,9 @@ export class ComplianceDossierBuilder {
             },
             custodyTimeline: events.map((ev, index) => ({
                 step: index + 1,
-                id: ev.id,
-                eventType: ev.eventType,
-                timestamp: ev.createdAt,
+                id: String(ev.id),
+                eventType: String(ev.eventType),
+                timestamp: ev.createdAt instanceof Date ? ev.createdAt.toISOString() : String(ev.createdAt),
                 eventHash: ev.eventHash,
                 handler: ev.eventData?.handlerName || ev.eventData?.authority || 'Certified Supply Chain Agent',
                 role: ev.eventData?.handlerRole || 'AUTHORIZED_ENTITY',
