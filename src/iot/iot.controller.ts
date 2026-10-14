@@ -43,4 +43,17 @@ export class IotController {
             sensorData,
         );
     }
+
+    @Post('simulate')
+    simulateTelemetry(
+        @Body()
+        data: {
+            serialNumber?: string;
+            temperature: number;
+            humidity: number;
+            location?: string;
+        },
+    ) {
+        return this.iotService.simulateTelemetry(data);
+    }
 }
