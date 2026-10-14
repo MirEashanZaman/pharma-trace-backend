@@ -3,6 +3,7 @@ import {
     UnauthorizedException,
     ConflictException,
     BadRequestException,
+    OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,13 +14,85 @@ import { RegisterDto, LoginDto, Web3LoginDto } from './dto/auth.dto';
 import { BlockchainService } from '../blockchain/blockchain.service';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
         private readonly jwtService: JwtService,
         private readonly blockchainService: BlockchainService,
     ) {}
+
+    async onModuleInit() {
+        await this.seedDefaultAccounts();
+    }
+
+    async seedDefaultAccounts() {
+        const admin = await this.userRepository.findOne({
+            where: { email: 'admin@pharma.com' },
+        });
+        if (admin) {
+            return;
+        }
+
+        const defaultPassword = await bcrypt.hash('123456', 10);
+        const usersToSeed = [
+            {
+                email: 'admin@pharma.com',
+                password: defaultPassword,
+                fullName: 'System Administrator',
+                role: UserRole.ADMIN,
+                organization: 'PharmaTrace Governance',
+                walletAddress: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266',
+            },
+            {
+                email: 'manufacturer@pharma.com',
+                password: defaultPassword,
+                fullName: 'Novartis Production Lead',
+                role: UserRole.MANUFACTURER,
+                organization: 'Novartis Global',
+                walletAddress: '0x70997970c51812dc3a010c7d01b50e0d17dc79c8',
+            },
+            {
+                email: 'distributor@pharma.com',
+                password: defaultPassword,
+                fullName: 'DHL Cold-Chain Logistics',
+                role: UserRole.DISTRIBUTOR,
+                organization: 'DHL Healthcare Logistics',
+                walletAddress: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+            },
+            {
+                email: 'pharmacy@pharma.com',
+                password: defaultPassword,
+                fullName: 'CVS Central Pharmacy',
+                role: UserRole.PHARMACY,
+                organization: 'CVS Health Care',
+                walletAddress: '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+            },
+            {
+                email: 'regulator@pharma.com',
+                password: defaultPassword,
+                fullName: 'FDA Inspection Officer',
+                role: UserRole.REGULATOR,
+                organization: 'Food and Drug Administration',
+                walletAddress: '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
+            },
+            {
+                email: 'customer@pharma.com',
+                password: defaultPassword,
+                fullName: 'John Patient / Consumer',
+                role: UserRole.CUSTOMER,
+                organization: 'Public Consumer / Patient',
+                walletAddress: '0xcd3b766cc5027d11055150d60447de35e1008473',
+            },
+        ];
+
+        for (const u of usersToSeed) {
+            const exists = await this.userRepository.findOne({ where: { email: u.email } });
+            if (!exists) {
+                await this.userRepository.save(this.userRepository.create(u));
+            }
+        }
+    }
 
     
     async register(dto: RegisterDto) {
