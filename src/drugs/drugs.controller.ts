@@ -4,6 +4,7 @@ import {
     Body,
     Get,
     Param,
+    Header,
 } from '@nestjs/common';
 
 import { DrugsService } from './drugs.service';
@@ -37,6 +38,22 @@ export class DrugsController {
         @Param('serialNumber') serialNumber: string,
     ) {
         return this.drugsService.getDrugEvents(serialNumber);
+    }
+
+    @Get(':serialNumber/audit-dossier')
+    getAuditDossier(
+        @Param('serialNumber') serialNumber: string,
+    ) {
+        return this.drugsService.getAuditDossier(serialNumber);
+    }
+
+    @Get(':serialNumber/export-csv')
+    @Header('Content-Type', 'text/csv')
+    @Header('Content-Disposition', 'attachment; filename="regulatory-dossier.csv"')
+    exportAuditCsv(
+        @Param('serialNumber') serialNumber: string,
+    ) {
+        return this.drugsService.exportAuditCsv(serialNumber);
     }
 
     @Get(':serialNumber')
