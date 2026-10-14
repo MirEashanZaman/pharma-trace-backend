@@ -4,13 +4,33 @@ PharmaTrace-ES is an event-driven pharmaceutical supply chain tracking and attes
 
 ---
 
-##  Architecture & Features
+## Architecture & Features
 
 * **Event Sourcing & CQRS**: Segregates lifecycle event commands from trace queries.
 * **Saga Custody Validation**: Orchestrates and enforces valid lifecycle transitions (e.g. `MANUFACTURED` -> `QUALITY_CHECKED` -> `PACKAGED` -> `SHIPPED` -> `RECEIVED` -> `DISTRIBUTED`).
 * **Web3 / Smart Contract Attestation Anchor**: Anchors SHA-256 data hashes immutably to Ethereum/EVM contracts via `contracts/PharmaTraceAttestation.sol`.
 * **IoT Telemetry Ingestion**: Captures temperature and humidity readings with threshold breach alerts.
 * **Tamper-Evident Ledger**: Validates audit-trail integrity and detects 100% of injected data alterations.
+
+---
+
+## Software Architecture & Production Design Patterns Matrix
+
+PharmaTrace-ES implements real-world enterprise design patterns directly within domain modules (Package-by-Feature) rather than artificial academic directory wrappers:
+
+| Design Pattern | Category | Concrete Implementation | Production Engineering Rationale |
+|---|---|---|---|
+| **Strategy** | Behavioral | `src/auth/jwt.strategy.ts`<br>`src/events/strategies/*.strategy.ts` | Pluggable JWT passport validation and event-specific verification routines (`ManufacturedStrategy`, `ShippedStrategy`, `ReceivedStrategy`, `TemperatureMonitoredStrategy`). |
+| **Factory** | Creational | `src/events/strategies/event-strategy.factory.ts` | Resolves and instantiates appropriate event processing strategies dynamically from incoming event types. |
+| **Builder** | Creational | `src/drugs/builders/compliance-dossier.builder.ts` | Chainable step-by-step construction of complex WHO/FDA GxP compliance audit dossiers across drug metadata, event logs, and temperature analytics. |
+| **Adapter** | Structural | `src/iot/adapters/iot-sensor.adapter.ts` | Normalizes heterogeneous external hardware streams (raw ESP32 strings, industrial Modbus register arrays, and REST JSON) into a unified domain telemetry schema. |
+| **Facade** | Structural | `src/blockchain/blockchain.facade.ts` | Hides low-level EVM RPC, gas estimation, ABI encoding, and transaction receipt polling behind a high-level attestation interface. |
+| **Circuit Breaker** | Resilience | `src/iot/circuit-breaker/cold-chain.circuit-breaker.ts` | Monitors cold-chain threshold compliance (2°C - 8°C); transitions between `CLOSED`, `OPEN`, and `HALF_OPEN` to halt shipments upon consecutive temperature breaches. |
+| **Observer** | Behavioral | `src/events/observers/audit.observer.ts`<br>`src/iot/iot.gateway.ts` | Decouples event generation from asynchronous notification subscribers, audit loggers, and WebSocket live cartography broadcasts. |
+| **Saga** | Architectural | `src/events/saga/custody-transfer.saga.ts` | Orchestrates distributed custody transitions across supply chain roles (Manufacturer, Distributor, Pharmacy) with compensatory rollback on invalid handovers. |
+| **Singleton** | Creational | NestJS IoC Dependency Injection | Services (`@Injectable()`) are managed as thread-safe singletons across the entire application runtime. |
+
+All design patterns are verified with automated unit tests in `src/patterns.spec.ts`.
 
 ---
 
