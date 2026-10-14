@@ -1,30 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { BlockchainService } from './blockchain.service';
+import { AttestationAnchor, VerifyAttestationResult } from './blockchain.types';
 
 export interface AnchorResult {
     success: boolean;
-    txHash: string;
-    blockNumber: number;
+    txHash?: string;
+    blockNumber?: number;
     anchoredHash: string;
     serialNumber: string;
     timestamp: number;
 }
 
-export interface OnChainVerification {
-    exists: boolean;
-    isValid: boolean;
-    drugSerialNumber: string;
-    eventType: string;
-    signer: string;
-    timestamp: number;
-    metadataUri: string;
-    onChain: boolean;
-}
-
 export interface IBlockchainFacade {
     anchorEventProof(serialNumber: string, eventType: string, eventHash: string): Promise<AnchorResult>;
-    verifyAttestation(hash: string): Promise<OnChainVerification>;
-    getContractAddress(): string;
+    verifyAttestation(hash: string): Promise<VerifyAttestationResult>;
 }
 
 @Injectable()
@@ -36,38 +25,25 @@ export class BlockchainFacade implements IBlockchainFacade {
         eventType: string,
         eventHash: string,
     ): Promise<AnchorResult> {
-        const receipt = await this.blockchainService.anchorAttestation(
+        const anchor: AttestationAnchor = await this.blockchainService.anchorAttestation(
             eventHash,
             serialNumber,
             eventType,
+            '0x0000000000000000000000000000000000000000',
             `ipfs://${eventHash}`,
         );
 
         return {
-            success: receipt.status === 1,
-            txHash: receipt.transactionHash,
-            blockNumber: receipt.blockNumber,
+            success: !anchor.isRevoked,
+            txHash: anchor.transactionHash,
+            blockNumber: anchor.blockNumber,
             anchoredHash: eventHash,
             serialNumber,
-            timestamp: Date.now(),
+            timestamp: anchor.timestamp,
         };
     }
 
-    async verifyAttestation(hash: string): Promise<OnChainVerification> {
-        const record = await this.blockchainService.getAttestation(hash);
-        return {
-            exists: record.exists,
-            isValid: record.exists,
-            drugSerialNumber: record.drugSerialNumber,
-            eventType: record.eventType,
-            signer: record.signer,
-            timestamp: Number(record.timestamp),
-            metadataUri: record.metadataUri,
-            onChain: true,
-        };
-    }
-
-    getContractAddress(): string {
-        return this.blockchainService.getContractAddress();
+    async verifyAttestation(hash: string): Promise<VerifyAttestationResult> {
+        return this.blockchainService.verifyAttestation(hash);
     }
 }
