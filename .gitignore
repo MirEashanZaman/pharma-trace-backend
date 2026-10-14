@@ -17,12 +17,16 @@ lerna-debug.log*
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+*.pem
+*.key
+*.cert
 
 # IDEs
 .idea
 .vscode
 *.sublime-workspace
 *.sw?
+.pio/
 
 # Environment
 .env
@@ -50,3 +54,9 @@ pids
 *.pid.lock
 .temp
 .tmp
+*.tsbuildinfo
+*.sqlite
+*.sqlite3
+*.db
+.cache/
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
