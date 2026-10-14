@@ -9,6 +9,8 @@ import { ColdChainCircuitBreaker } from './iot/circuit-breaker/cold-chain.circui
 import { BlockchainFacade } from './blockchain/blockchain.facade';
 import { AuditObserver } from './events/observers/audit.observer';
 import { CustodyTransferSaga } from './events/saga/custody-transfer.saga';
+import { CustodyRollbackEngine } from './events/saga/custody-rollback.engine';
+import { RpcLoadBalancer } from './blockchain/load-balancer/rpc-load-balancer';
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
 
@@ -250,6 +252,83 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
                     UserRole.MANUFACTURER,
                 ),
             ).not.toThrow();
+        });
+    });
+
+    describe('8. Load Balancer Pattern', () => {
+        it('should cycle through healthy nodes using round-robin distribution', () => {
+            const lb = new RpcLoadBalancer();
+            const node1 = lb.selectNode('ROUND_ROBIN');
+            const node2 = lb.selectNode('ROUND_ROBIN');
+            const node3 = lb.selectNode('ROUND_ROBIN');
+
+            expect(node1).toBeDefined();
+            expect(node2).toBeDefined();
+            expect(node3).toBeDefined();
+            expect(node1.id).not.toBe(node2.id);
+        });
+
+        it('should execute operation with failover when primary node fails', async () => {
+            const lb = new RpcLoadBalancer();
+            let attempts = 0;
+
+            const { result, servedBy } = await lb.executeWithFailover(async (node) => {
+                attempts++;
+                if (node.id === 'rpc-primary-local') {
+                    throw new Error('RPC Connection Timed Out (504)');
+                }
+                return `Success from ${node.name}`;
+            }, 'PRIORITY_FAILOVER');
+
+            expect(attempts).toBe(2);
+            expect(result).toContain('Success from');
+            expect(servedBy.id).toBe('rpc-secondary-sepolia');
+        });
+
+        it('should trip an unhealthy node after reaching failure threshold', () => {
+            const lb = new RpcLoadBalancer();
+            lb.recordFailure('rpc-primary-local');
+            lb.recordFailure('rpc-primary-local');
+            lb.recordFailure('rpc-primary-local');
+
+            const status = lb.getPoolStatus();
+            const primary = status.find((n) => n.id === 'rpc-primary-local');
+            expect(primary?.isHealthy).toBe(false);
+            expect(primary?.consecutiveFailures).toBe(3);
+        });
+    });
+
+    describe('9. Saga Compensating Rollback Pattern', () => {
+        const rollbackEngine = new CustodyRollbackEngine();
+
+        it('should determine appropriate compensating reversal action for failed SOLD event', () => {
+            const plan = rollbackEngine.getCompensatingAction(EventType.SOLD);
+            expect(plan.failedEventType).toBe(EventType.SOLD);
+            expect(plan.restoredState).toBe(EventType.DISTRIBUTED);
+            expect(plan.compensatingEventType).toBe(EventType.QUARANTINED);
+        });
+
+        it('should determine appropriate compensating reversal action for failed SHIPPED event', () => {
+            const plan = rollbackEngine.getCompensatingAction(EventType.SHIPPED);
+            expect(plan.failedEventType).toBe(EventType.SHIPPED);
+            expect(plan.restoredState).toBe(EventType.PACKAGED);
+            expect(plan.requiresRegulatorySignoff).toBe(true);
+        });
+
+        it('should execute compensating rollback and generate structured audit report', () => {
+            const report = rollbackEngine.executeRollback(
+                'SN-2026-AMOX500',
+                EventType.SHIPPED,
+                'Temperature sensor detected severe excursion > 16°C during loading transit',
+                'Cold-Chain Regulatory Agent #408',
+            );
+
+            expect(report.rollbackId).toMatch(/^ROLLBACK-/);
+            expect(report.serialNumber).toBe('SN-2026-AMOX500');
+            expect(report.failedEvent).toBe(EventType.SHIPPED);
+            expect(report.restoredCustodyState).toBe(EventType.PACKAGED);
+            expect(report.isCompensated).toBe(true);
+            expect(report.initiatedBy).toBe('Cold-Chain Regulatory Agent #408');
         });
     });
 });
