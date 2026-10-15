@@ -109,6 +109,14 @@ contract PharmaTraceAttestation {
         string calldata eventType,
         string calldata metadataUri
     ) external returns (bool) {
+        require(
+            msg.sender == owner ||
+            roles[MANUFACTURER_ROLE][msg.sender] ||
+            roles[DISTRIBUTOR_ROLE][msg.sender] ||
+            roles[DISPENSER_ROLE][msg.sender] ||
+            roles[REGULATOR_ROLE][msg.sender],
+            "Caller not authorized with attestation role"
+        );
         require(dataHash != bytes32(0), "Invalid data hash");
         require(attestations[dataHash].blockTimestamp == 0, "Attestation already exists");
 
@@ -141,6 +149,12 @@ contract PharmaTraceAttestation {
         uint32 batchSize,
         string calldata ipfsCid
     ) external returns (bool) {
+        require(
+            msg.sender == owner ||
+            roles[MANUFACTURER_ROLE][msg.sender] ||
+            roles[REGULATOR_ROLE][msg.sender],
+            "Caller not authorized with batch anchor role"
+        );
         require(merkleRoot != bytes32(0), "Invalid Merkle root");
         require(batchSize > 0, "Batch size must be greater than zero");
         require(batches[merkleRoot].blockTimestamp == 0, "Batch root already anchored");
