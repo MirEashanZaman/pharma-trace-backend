@@ -21,6 +21,10 @@ import { IpfsService } from './blockchain/ipfs/ipfs.service';
 import { ZkProofEngine } from './blockchain/zk/zk-proof.engine';
 import { PaymasterService } from './blockchain/account-abstraction/paymaster.service';
 import { SoulboundAccreditationService, AccreditationType } from './blockchain/sbt/soulbound-accreditation.service';
+import { DigitalTwinService, DigitalTwinStatus } from './blockchain/digital-twin/digital-twin.service';
+import { PharmaEscrowService, EscrowState } from './blockchain/escrow/pharma-escrow.service';
+import { DidResolverService } from './blockchain/did/did-resolver.service';
+import { NfcVerificationService } from './iot/nfc/nfc-verification.service';
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
 import { ethers } from 'ethers';
@@ -789,5 +793,225 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             ).rejects.toThrow('Only the issuing regulatory body can revoke this accreditation');
         });
     });
+
+    describe('16. Physical-Digital Twin & Anti-Recirculation Burn Engine', () => {
+        const twinService = new DigitalTwinService();
+        const manufacturerWallet = ethers.Wallet.createRandom();
+        const distributorWallet = ethers.Wallet.createRandom();
+        const pharmacyWallet = ethers.Wallet.createRandom();
+
+        it('should mint digital twin with GS1 GTIN and serial number', async () => {
+            const expirationDate = Math.floor(Date.now() / 1000) + 365 * 86400;
+            const twin = await twinService.mintDigitalTwin({
+                gtin: '00300450445123',
+                batchNumber: 'BATCH-TWIN-01',
+                serialNumber: 'SN-TWIN-9901',
+                expirationDate,
+                holderAddress: manufacturerWallet.address,
+                ipfsDossierCid: 'bafybeictwindossier123',
+            });
+
+            expect(twin.tokenId).toBeDefined();
+            expect(twin.status).toBe(DigitalTwinStatus.MINTED);
+            expect(twin.currentHolder).toBe(manufacturerWallet.address);
+
+            const verification = await twinService.verifyAuthenticity('SN-TWIN-9901');
+            expect(verification.exists).toBe(true);
+            expect(verification.isAuthentic).toBe(true);
+            expect(verification.isBurned).toBe(false);
+        });
+
+        it('should transfer custody between authorized supply chain actors', async () => {
+            const transferred = await twinService.transferCustody(
+                'SN-TWIN-9901',
+                manufacturerWallet.address,
+                distributorWallet.address,
+            );
+            expect(transferred.currentHolder).toBe(distributorWallet.address);
+            expect(transferred.status).toBe(DigitalTwinStatus.IN_TRANSIT);
+
+            await twinService.transferCustody(
+                'SN-TWIN-9901',
+                distributorWallet.address,
+                pharmacyWallet.address,
+            );
+        });
+
+        it('should burn digital twin upon patient dispensing and permanently prevent recirculation', async () => {
+            const burned = await twinService.burnOnDispense('SN-TWIN-9901', pharmacyWallet.address);
+            expect(burned.status).toBe(DigitalTwinStatus.BURNED);
+            expect(burned.currentHolder).toBe('0x0000000000000000000000000000000000000000');
+            expect(burned.dispensedBy).toBe(pharmacyWallet.address);
+
+            const reVerify = await twinService.verifyAuthenticity('SN-TWIN-9901');
+            expect(reVerify.isBurned).toBe(true);
+            expect(reVerify.isAuthentic).toBe(false);
+
+            await expect(
+                twinService.burnOnDispense('SN-TWIN-9901', pharmacyWallet.address),
+            ).rejects.toThrow('Anti-recirculation alert: drug unit has already been burned and consumed');
+        });
+    });
+
+    describe('17. Conditional Delivery vs Payment Commercial Escrow Engine', () => {
+        const escrowService = new PharmaEscrowService();
+        const buyerWallet = ethers.Wallet.createRandom();
+        const sellerWallet = ethers.Wallet.createRandom();
+
+        it('should create funded escrow order for pharmaceutical shipment', async () => {
+            const order = await escrowService.createEscrowOrder({
+                buyer: buyerWallet.address,
+                seller: sellerWallet.address,
+                amountEth: 2.5,
+                drugSerialNumber: 'SN-ESCROW-8801',
+                timeoutHours: 48,
+            });
+
+            expect(order.orderId).toBeDefined();
+            expect(order.status).toBe(EscrowState.FUNDED);
+            expect(order.amountEth).toBe(2.5);
+        });
+
+        it('should automatically release escrow upon custody acceptance and compliant cold-chain readings', async () => {
+            const order = await escrowService.createEscrowOrder({
+                buyer: buyerWallet.address,
+                seller: sellerWallet.address,
+                amountEth: 5.0,
+                drugSerialNumber: 'SN-ESCROW-COMPLIANT',
+            });
+
+            const result = await escrowService.evaluateAndReleaseEscrow(
+                order.orderId,
+                true,
+                [4.1, 4.3, 4.2, 4.5],
+                2.0,
+                8.0,
+            );
+
+            expect(result.success).toBe(true);
+            expect(result.released).toBe(true);
+            expect(result.order.status).toBe(EscrowState.RELEASED);
+            expect(result.order.settlementTxHash).toBeDefined();
+        });
+
+        it('should withhold payout and flag dispute upon cold-chain temperature excursion', async () => {
+            const order = await escrowService.createEscrowOrder({
+                buyer: buyerWallet.address,
+                seller: sellerWallet.address,
+                amountEth: 3.0,
+                drugSerialNumber: 'SN-ESCROW-EXCURSION',
+            });
+
+            const result = await escrowService.evaluateAndReleaseEscrow(
+                order.orderId,
+                true,
+                [4.2, 12.8, 4.3],
+                2.0,
+                8.0,
+            );
+
+            expect(result.success).toBe(false);
+            expect(result.released).toBe(false);
+            expect(result.order.status).toBe(EscrowState.DISPUTED);
+            expect(result.reason).toContain('Cold-chain temperature violation');
+
+            const refunded = await escrowService.triggerBreachRefund(
+                order.orderId,
+                'Temperature excursion beyond 8C in transit',
+            );
+            expect(refunded.status).toBe(EscrowState.REFUNDED);
+        });
+    });
+
+    describe('18. W3C Decentralized Identifier (did:ethr) & GS1 GLN Resolver', () => {
+        const didService = new DidResolverService();
+        const testWallet = ethers.Wallet.createRandom();
+
+        it('should resolve pre-registered enterprise DID document with GS1 GLN and FDA FEI', async () => {
+            const did = 'did:ethr:0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+            const doc = await didService.resolveDid(did);
+
+            expect(doc.id).toBe(did);
+            expect(doc.regulatoryMetadata.gln).toBe('0844514000001');
+            expect(doc.regulatoryMetadata.fdaFei).toBe('FEI-3004819201');
+            expect(doc.regulatoryMetadata.isDscsaAuthorizedTradingPartner).toBe(true);
+        });
+
+        it('should register and resolve custom trading partner DID document', async () => {
+            const doc = didService.registerEntity(
+                testWallet.address,
+                'Apex Specialty Wholesaler Corp',
+                '0844514000999',
+                'FEI-3009998888',
+                ['DISTRIBUTOR'],
+            );
+
+            expect(doc.id).toBe(`did:ethr:${testWallet.address}`);
+            const resolved = await didService.resolveAddress(testWallet.address);
+            expect(resolved.regulatoryMetadata.entityName).toBe('Apex Specialty Wholesaler Corp');
+        });
+
+        it('should verify cryptographic signature against DID controller key', async () => {
+            const did = `did:ethr:${testWallet.address}`;
+            const message = 'FDA_DSCSA_TRANSACTION_STATEMENT_VERIFICATION_2026';
+            const signature = await testWallet.signMessage(message);
+
+            const isValid = didService.verifyDidSignature(did, message, signature);
+            expect(isValid).toBe(true);
+
+            const forgedWallet = ethers.Wallet.createRandom();
+            const forgedSig = await forgedWallet.signMessage(message);
+            const isForgedValid = didService.verifyDidSignature(did, message, forgedSig);
+            expect(isForgedValid).toBe(false);
+        });
+    });
+
+    describe('19. Dynamic Cryptographic NFC (AES-128 CMAC) Tag Verification', () => {
+        const nfcService = new NfcVerificationService();
+        const sampleTagUid = '04a1b2c3d4e5f6';
+        const sampleMasterKey = '00112233445566778899aabbccddeeff';
+        const sampleSerial = 'SN-NFC-VACCINE-01';
+
+        it('should register dynamic NFC tag and verify valid monotonic tap scan', () => {
+            nfcService.registerTag(sampleTagUid, sampleMasterKey, sampleSerial);
+            const tap1 = nfcService.generateSimulatedTagTap(sampleTagUid);
+
+            expect(tap1.tapCounter).toBe(1);
+            expect(tap1.cmac.length).toBe(16);
+
+            const verification = nfcService.verifyScan(sampleTagUid, tap1.tapCounter, tap1.cmac);
+            expect(verification.isValid).toBe(true);
+            expect(verification.antiCloningVerified).toBe(true);
+            expect(verification.drugSerialNumber).toBe(sampleSerial);
+        });
+
+        it('should accept subsequent sequential taps with increasing counters', () => {
+            const tap2 = nfcService.generateSimulatedTagTap(sampleTagUid);
+            expect(tap2.tapCounter).toBe(2);
+
+            const verification = nfcService.verifyScan(sampleTagUid, tap2.tapCounter, tap2.cmac);
+            expect(verification.isValid).toBe(true);
+        });
+
+        it('should detect and reject replayed tap counter (cloning attack)', () => {
+            const replayedCounter = 1;
+            const forgedCmac = nfcService.computeCmac(
+                Buffer.from(sampleMasterKey, 'hex'),
+                sampleTagUid,
+                replayedCounter,
+            );
+
+            const verification = nfcService.verifyScan(sampleTagUid, replayedCounter, forgedCmac);
+            expect(verification.isValid).toBe(false);
+            expect(verification.reason).toContain('Replay / clone detection');
+        });
+
+        it('should reject forged CMAC signature', () => {
+            const verification = nfcService.verifyScan(sampleTagUid, 10, 'deadbeef12345678');
+            expect(verification.isValid).toBe(false);
+            expect(verification.reason).toContain('Cryptographic CMAC signature mismatch');
+        });
+    });
 });
+
 
