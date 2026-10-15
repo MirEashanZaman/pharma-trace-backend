@@ -17,6 +17,10 @@ import { Eip712CustodyService, CUSTODY_TYPED_DATA_TYPES } from './blockchain/eip
 import { EpcisAggregator } from './blockchain/epcis/epcis-aggregator';
 import { PackagingLevel } from './blockchain/epcis/epcis-hierarchy.types';
 import { HardwareOracleService } from './iot/oracle/hardware-oracle.service';
+import { IpfsService } from './blockchain/ipfs/ipfs.service';
+import { ZkProofEngine } from './blockchain/zk/zk-proof.engine';
+import { PaymasterService } from './blockchain/account-abstraction/paymaster.service';
+import { SoulboundAccreditationService, AccreditationType } from './blockchain/sbt/soulbound-accreditation.service';
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
 import { ethers } from 'ethers';
@@ -588,4 +592,201 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             expect(report.reason).toContain('Signature mismatch');
         });
     });
+
+    describe('12. IPFS Decentralized Storage Pattern', () => {
+        const ipfs = new IpfsService();
+
+        it('should pin audit dossier and return deterministic CIDv1 base32 string', async () => {
+            const dossier = {
+                serialNumber: 'SN-IPFS-9901',
+                manufacturingLot: 'LOT-2026-ALPHA',
+                inspectionAuthority: 'FDA_US',
+                temperatureReadings: [4.1, 4.3, 4.2],
+            };
+
+            const pinResult = await ipfs.pinJson(dossier, 'SN-IPFS-9901-dossier');
+            expect(pinResult.cid).toBeDefined();
+            expect(pinResult.cid.startsWith('bafybeic')).toBe(true);
+            expect(pinResult.pinStatus).toBe('PINNED');
+
+            const retrieved = await ipfs.retrieveJson(pinResult.cid);
+            expect(retrieved).toEqual(dossier);
+        });
+
+        it('should detect data corruption against stored CID hash', async () => {
+            const dossier = { test: 'valid-payload' };
+            const pinResult = await ipfs.pinJson(dossier);
+
+            const isValid = ipfs.verifyCid(pinResult.cid, dossier);
+            expect(isValid).toBe(true);
+
+            const corrupted = { test: 'tampered-payload' };
+            const isCorruptedValid = ipfs.verifyCid(pinResult.cid, corrupted);
+            expect(isCorruptedValid).toBe(false);
+        });
+    });
+
+    describe('13. Zero-Knowledge Proof Engine', () => {
+        const zkEngine = new ZkProofEngine();
+
+        it('should generate and verify compliance proof for safe temperature reading', () => {
+            const { proof, isCompliant } = zkEngine.generateColdChainProof(
+                [4.5, 4.2, 5.0],
+                2.0,
+                8.0,
+                '0xbatch1234567890abcdef',
+            );
+
+            expect(isCompliant).toBe(true);
+            expect(proof.protocol).toBe('groth16');
+            expect(proof.publicSignals[1]).toBe('2.00');
+            expect(proof.publicSignals[2]).toBe('8.00');
+
+            const verification = zkEngine.verifyColdChainProof(proof);
+            expect(verification.isValid).toBe(true);
+            expect(verification.isCompliant).toBe(true);
+        });
+
+        it('should mark verification invalid for out-of-boundary temperature', () => {
+            const { proof, isCompliant } = zkEngine.generateColdChainProof(
+                [12.5],
+                2.0,
+                8.0,
+                '0xbatchviolation123',
+            );
+
+            expect(isCompliant).toBe(false);
+
+            const verification = zkEngine.verifyColdChainProof(proof);
+            expect(verification.isValid).toBe(false);
+            expect(verification.isCompliant).toBe(false);
+        });
+
+        it('should generate and verify zero-knowledge Merkle membership proof', () => {
+            const zkProof = zkEngine.generateMembershipProof(
+                'SERIAL_C',
+                '0xmerkleRoot1234567890abcdef',
+                'secretSalt99',
+            );
+
+            expect(zkProof.pi_a.length).toBe(2);
+            expect(zkProof.publicSignals[0]).toBe('0xmerkleRoot1234567890abcdef');
+
+            const verification = zkEngine.verifyMembershipProof(zkProof);
+            expect(verification.isValid).toBe(true);
+            expect(verification.merkleRoot).toBe('0xmerkleRoot1234567890abcdef');
+        });
+    });
+
+    describe('14. ERC-4337 Account Abstraction Paymaster', () => {
+        const paymaster = new PaymasterService();
+
+        it('should sponsor gasless transaction for valid pharmaceutical action', async () => {
+            const userOp = {
+                sender: '0x1111111111111111111111111111111111111111',
+                nonce: 0,
+                initCode: '0x',
+                callData: '0x',
+                callGasLimit: 200000,
+                verificationGasLimit: 100000,
+                preVerificationGas: 50000,
+                maxFeePerGas: BigInt(2000000000),
+                maxPriorityFeePerGas: BigInt(1000000000),
+            };
+
+            const sponsorship = await paymaster.sponsorUserOperation(userOp, 'packBatch');
+            expect(sponsorship.paymasterAndData).toBeDefined();
+            expect(sponsorship.isSponsored).toBe(true);
+
+            const verification = paymaster.validateSponsoredOperation({
+                ...userOp,
+                paymasterAndData: sponsorship.paymasterAndData,
+            });
+            expect(verification.isValid).toBe(true);
+        });
+
+        it('should reject gas sponsorship for unauthorized operation type', async () => {
+            const userOp = {
+                sender: '0x1111111111111111111111111111111111111111',
+                nonce: 1,
+                initCode: '0x',
+                callData: '0x',
+                callGasLimit: 200000,
+                verificationGasLimit: 100000,
+                preVerificationGas: 50000,
+                maxFeePerGas: BigInt(2000000000),
+                maxPriorityFeePerGas: BigInt(1000000000),
+            };
+
+            await expect(
+                paymaster.sponsorUserOperation(userOp, 'unauthorizedDrainingAction'),
+            ).rejects.toThrow("Action 'unauthorizedDrainingAction' is not authorized for corporate gas sponsorship");
+        });
+    });
+
+    describe('15. Soulbound Accreditation & ERC-5192 Compliance Badges', () => {
+        const sbtService = new SoulboundAccreditationService();
+        const authorityWallet = ethers.Wallet.createRandom();
+        const manufacturerWallet = ethers.Wallet.createRandom();
+
+        it('should issue locked soulbound badge and verify cryptographic signature', async () => {
+            const badge = await sbtService.issueAccreditation(authorityWallet, {
+                recipient: manufacturerWallet.address,
+                accreditationType: AccreditationType.GMP_MANUFACTURING,
+                jurisdiction: 'US-FDA',
+                validityDays: 365,
+                metadataCid: 'bafybeicgmpcert1234567890',
+            });
+
+            expect(badge.locked).toBe(true);
+            expect(badge.revoked).toBe(false);
+            expect(badge.recipient).toBe(manufacturerWallet.address);
+
+            const verification = await sbtService.verifyBadge(badge.tokenId);
+            expect(verification.valid).toBe(true);
+
+            const isAccredited = await sbtService.hasValidAccreditation(
+                manufacturerWallet.address,
+                AccreditationType.GMP_MANUFACTURING,
+            );
+            expect(isAccredited).toBe(true);
+        });
+
+        it('should allow authority to revoke badge and reflect in verification', async () => {
+            const badge = await sbtService.issueAccreditation(authorityWallet, {
+                recipient: manufacturerWallet.address,
+                accreditationType: AccreditationType.COLD_CHAIN_QUALIFIED,
+                jurisdiction: 'EU-EMA',
+                validityDays: 90,
+                metadataCid: 'bafybeiceucoldchaincert',
+            });
+
+            const revoked = await sbtService.revokeAccreditation(
+                authorityWallet,
+                badge.tokenId,
+                'Temperature deviation protocol breach',
+            );
+            expect(revoked.revoked).toBe(true);
+
+            const verification = await sbtService.verifyBadge(badge.tokenId);
+            expect(verification.valid).toBe(false);
+            expect(verification.reason).toContain('Temperature deviation protocol breach');
+        });
+
+        it('should reject revocation from non-issuing authority', async () => {
+            const maliciousSigner = ethers.Wallet.createRandom();
+            const badge = await sbtService.issueAccreditation(authorityWallet, {
+                recipient: manufacturerWallet.address,
+                accreditationType: AccreditationType.GDP_DISTRIBUTION,
+                jurisdiction: 'WHO-GLOBAL',
+                validityDays: 180,
+                metadataCid: 'bafybeicwhogdpcert',
+            });
+
+            await expect(
+                sbtService.revokeAccreditation(maliciousSigner, badge.tokenId, 'Fake revocation'),
+            ).rejects.toThrow('Only the issuing regulatory body can revoke this accreditation');
+        });
+    });
 });
+
