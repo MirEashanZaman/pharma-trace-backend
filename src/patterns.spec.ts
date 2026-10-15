@@ -33,6 +33,9 @@ import {
     SensorConsensusEngine,
     CheckpointCluster,
 } from './iot/consensus/sensor-consensus.engine';
+import { VerifiableCredentialService } from './blockchain/vc/verifiable-credential.service';
+import { StatusList2021Registry } from './blockchain/vc/status-list-2021.registry';
+import { PresentationDefinition, VerifiableCredential } from './blockchain/vc/vc.types';
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
 import { ethers } from 'ethers';
@@ -1558,6 +1561,157 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             expect(() => consensusEngine.evaluateCheckpoint(singleSensorCluster)).toThrow(
                 'requires at least 2 independent sensor readings',
             );
+        });
+    });
+
+    describe('26. W3C Verifiable Credentials (VC) Issuance & Presentation Exchange Pattern', () => {
+        const statusRegistry = new StatusList2021Registry();
+        const didResolver = new DidResolverService();
+        const vcService = new VerifiableCredentialService(statusRegistry, didResolver);
+
+        const qpWallet = ethers.Wallet.createRandom();
+        const authorityWallet = ethers.Wallet.createRandom();
+        const distributorWallet = ethers.Wallet.createRandom();
+        const testSerial = 'SN-2026-VC-AMOX-01';
+
+        let issuedBatchVc: VerifiableCredential;
+
+        it('should issue cryptographic W3C PharmaceuticalBatchReleaseCredential signed by Qualified Person', async () => {
+            const vc = await vcService.issueBatchReleaseCredential(
+                {
+                    drugSerialNumber: testSerial,
+                    batchNumber: 'BATCH-2026-QP-01',
+                    gtin: '00300018899201',
+                    drugName: 'Amoxicillin Trihydrate 500mg',
+                    manufacturer: 'BioGenix International GmbH',
+                    gmpCertified: true,
+                    qualifiedPersonName: 'Dr. Evelyn Vance',
+                    qualifiedPersonLicense: 'QP-EU-2026-8891',
+                    regulatoryAuthority: 'European Medicines Agency (EMA)',
+                    coldChainSpecs: { minTemp: 2.0, maxTemp: 8.0 },
+                },
+                qpWallet,
+            );
+
+            expect(vc.id).toBeDefined();
+            expect(vc.type).toContain('PharmaceuticalBatchReleaseCredential');
+            expect(vc.issuer.ethereumAddress.toLowerCase()).toBe(qpWallet.address.toLowerCase());
+            expect(vc.credentialStatus).toBeDefined();
+            expect(vc.credentialStatus?.type).toBe('StatusList2021Entry');
+            expect(vc.proof.proofValue).toBeDefined();
+
+            issuedBatchVc = vc;
+
+            const verification = await vcService.verifyCredential(vc);
+            expect(verification.isValid).toBe(true);
+        });
+
+        it('should issue W3C CarrierAccreditationCredential for cold-chain logistics provider', async () => {
+            const carrierWallet = ethers.Wallet.createRandom();
+            const carrierVc = await vcService.issueCarrierAccreditationCredential(
+                {
+                    carrierName: 'Apex Specialized Reefer Fleet Ltd',
+                    gdpLicenseNumber: 'GDP-US-2026-4402',
+                    authorizedVehicleFleet: ['VAN-408', 'VAN-409', 'REEFER-CONT-901'],
+                    fipsHsmEnabled: true,
+                    jurisdiction: 'United States & European Union',
+                },
+                carrierWallet.address,
+                authorityWallet,
+            );
+
+            expect(carrierVc.type).toContain('CarrierAccreditationCredential');
+            expect(carrierVc.credentialSubject.id).toBe(`did:ethr:${carrierWallet.address}`);
+            expect(carrierVc.credentialSubject.fipsHsmEnabled).toBe(true);
+
+            const verification = await vcService.verifyCredential(carrierVc);
+            expect(verification.isValid).toBe(true);
+        });
+
+        it('should create and verify W3C Verifiable Presentation with anti-replay challenge nonce', async () => {
+            const challenge = 'CHALLENGE-NONCE-1792095999';
+            const vp = await vcService.createVerifiablePresentation(
+                [issuedBatchVc],
+                distributorWallet,
+                challenge,
+            );
+
+            expect(vp.type).toContain('VerifiablePresentation');
+            expect(vp.holder).toBe(`did:ethr:${distributorWallet.address}`);
+            expect(vp.proof.challenge).toBe(challenge);
+
+            const definition: PresentationDefinition = {
+                id: 'batch-release-verification',
+                purpose: 'Verify QP batch release authorization',
+                input_descriptors: [
+                    {
+                        id: 'batch-descriptor',
+                        purpose: 'Check GMP certification',
+                        schema: 'PharmaceuticalBatchReleaseCredential',
+                    },
+                ],
+            };
+
+            const pexResult = await vcService.verifyPresentationExchange(vp, definition, challenge);
+            expect(pexResult.isValid).toBe(true);
+            expect(pexResult.verifiedCredentialsCount).toBe(1);
+            expect(pexResult.claims.drugSerialNumber).toBe(testSerial);
+        });
+
+        it('should reject replay attacks with mismatched presentation challenge nonces', async () => {
+            const validChallenge = 'CHALLENGE-LEGIT-001';
+            const vp = await vcService.createVerifiablePresentation(
+                [issuedBatchVc],
+                distributorWallet,
+                validChallenge,
+            );
+
+            const definition: PresentationDefinition = {
+                id: 'anti-replay-gate',
+                purpose: 'Verify challenge',
+                input_descriptors: [{ id: 'desc', purpose: 'test', schema: 'PharmaceuticalBatchReleaseCredential' }],
+            };
+
+            const pexResult = await vcService.verifyPresentationExchange(vp, definition, 'STALE-REPLAYED-CHALLENGE');
+            expect(pexResult.isValid).toBe(false);
+            expect(pexResult.reasons?.[0]).toContain('Presentation challenge does not match');
+        });
+
+        it('should revoke credential via W3C StatusList2021 bitstring and immediately fail verification', async () => {
+            const statusIndex = issuedBatchVc.credentialStatus!.statusListIndex;
+            expect(statusRegistry.isRevoked(statusIndex)).toBe(false);
+
+            const revocation = vcService.revokeCredential(
+                issuedBatchVc.id,
+                statusIndex,
+                authorityWallet.address,
+                'Discovered microbiological endotoxin contamination in QC retain samples',
+            );
+            expect(revocation.success).toBe(true);
+            expect(statusRegistry.isRevoked(statusIndex)).toBe(true);
+
+            const verification = await vcService.verifyCredential(issuedBatchVc);
+            expect(verification.isValid).toBe(false);
+            expect(verification.reason).toContain('revoked on StatusList2021 registry');
+            expect(verification.reason).toContain('microbiological endotoxin contamination');
+        });
+
+        it('should enforce custody handover prerequisites and block transfer when credential is revoked', async () => {
+            const challenge = 'CUSTODY-TRANSFER-CHALLENGE-99';
+            const vp = await vcService.createVerifiablePresentation(
+                [issuedBatchVc],
+                distributorWallet,
+                challenge,
+            );
+
+            await expect(
+                vcService.enforceCustodyHandoverPrerequisites(
+                    vp,
+                    testSerial,
+                    distributorWallet.address,
+                    challenge,
+                ),
+            ).rejects.toThrow('Custody handover blocked by W3C Presentation Exchange');
         });
     });
 });
