@@ -13,9 +13,11 @@ import { SoulboundAccreditationService } from './sbt/soulbound-accreditation.ser
 import { DigitalTwinService } from './digital-twin/digital-twin.service';
 import { PharmaEscrowService } from './escrow/pharma-escrow.service';
 import { DidResolverService } from './did/did-resolver.service';
+import { DigitalLinkService } from './digital-link/digital-link.service';
+import { DigitalLinkController } from './digital-link/digital-link.controller';
 
 @Module({
-    controllers: [BlockchainController],
+    controllers: [BlockchainController, DigitalLinkController],
     providers: [
         BlockchainService,
         BlockchainFacade,
@@ -30,6 +32,7 @@ import { DidResolverService } from './did/did-resolver.service';
         DigitalTwinService,
         PharmaEscrowService,
         DidResolverService,
+        DigitalLinkService,
     ],
     exports: [
         BlockchainService,
@@ -45,6 +48,7 @@ import { DidResolverService } from './did/did-resolver.service';
         DigitalTwinService,
         PharmaEscrowService,
         DidResolverService,
+        DigitalLinkService,
     ],
 })
 export class BlockchainModule {}
