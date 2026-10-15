@@ -5,6 +5,7 @@ import {
     Get,
     UseGuards,
     Request,
+    Param,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, Web3LoginDto } from './dto/auth.dto';
@@ -13,6 +14,11 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
+
+    @Get('challenge/:walletAddress')
+    getChallenge(@Param('walletAddress') walletAddress: string) {
+        return this.authService.generateChallenge(walletAddress);
+    }
 
     @Post('register')
     register(@Body() dto: RegisterDto) {
