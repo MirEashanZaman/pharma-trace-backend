@@ -9,6 +9,7 @@ import { DigitalTwinService } from './digital-twin/digital-twin.service';
 import { PharmaEscrowService } from './escrow/pharma-escrow.service';
 import { DidResolverService } from './did/did-resolver.service';
 import { EpcisJsonLdService } from './epcis/epcis-jsonld.service';
+import { SensorConsensusEngine } from '../iot/consensus/sensor-consensus.engine';
 
 describe('BlockchainModule Integration', () => {
     let service: BlockchainService;
@@ -27,6 +28,7 @@ describe('BlockchainModule Integration', () => {
                 PharmaEscrowService,
                 DidResolverService,
                 EpcisJsonLdService,
+                SensorConsensusEngine,
             ],
         }).compile();
 
