@@ -10,7 +10,7 @@ import {
 import { IsString, IsNotEmpty, IsOptional, MaxLength } from 'class-validator';
 import { BlockchainService } from './blockchain.service';
 import { IpfsService } from './ipfs/ipfs.service';
-import { ZkProofEngine, ZkSnarkProof } from './zk/zk-proof.engine';
+import { ZkProofEngine } from './zk/zk-proof.engine';
 import { PaymasterService } from './account-abstraction/paymaster.service';
 import { SoulboundAccreditationService } from './sbt/soulbound-accreditation.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -133,7 +133,7 @@ export class BlockchainController {
     }
 
     @Post('zk/verify-cold-chain')
-    verifyColdChainProof(@Body() proof: ZkSnarkProof) {
+    verifyColdChainProof(@Body() proof: any) {
         return this.zkProofEngine.verifyColdChainProof(proof);
     }
 
