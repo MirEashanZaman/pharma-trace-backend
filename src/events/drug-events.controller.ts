@@ -1,16 +1,16 @@
 import {
     Body,
     Controller,
-    Delete,
     Get,
     Param,
     Post,
     Req,
+    UseGuards,
 } from '@nestjs/common';
 
 import { DrugEventsService } from './drug-events.service';
-
 import { CreateDrugEventDto } from './dto/create-drug-event.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('drug-events')
 export class DrugEventsController {
@@ -18,6 +18,7 @@ export class DrugEventsController {
         private readonly drugEventsService: DrugEventsService,
     ) { }
 
+    @UseGuards(JwtAuthGuard)
     @Post()
     create(
         @Body() body: CreateDrugEventDto,
@@ -40,15 +41,6 @@ export class DrugEventsController {
         @Param('serialNumber') serialNumber: string,
     ) {
         return this.drugEventsService.executeGetQuery(
-            serialNumber,
-        );
-    }
-
-    @Delete(':serialNumber')
-    deleteBySerialNumber(
-        @Param('serialNumber') serialNumber: string,
-    ) {
-        return this.drugEventsService.deleteBySerialNumber(
             serialNumber,
         );
     }
