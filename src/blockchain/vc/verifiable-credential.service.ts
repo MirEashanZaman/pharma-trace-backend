@@ -67,7 +67,16 @@ export class VerifiableCredentialService {
 
     const fullSubject: BatchReleaseSubject = {
       id: `urn:sgtin:${subject.gtin}.${subject.drugSerialNumber}`,
-      ...subject,
+      drugSerialNumber: subject.drugSerialNumber,
+      batchNumber: subject.batchNumber,
+      gtin: subject.gtin,
+      drugName: subject.drugName,
+      manufacturer: subject.manufacturer,
+      gmpCertified: subject.gmpCertified,
+      qualifiedPersonName: subject.qualifiedPersonName,
+      qualifiedPersonLicense: subject.qualifiedPersonLicense,
+      regulatoryAuthority: subject.regulatoryAuthority,
+      coldChainSpecs: subject.coldChainSpecs,
     };
 
     const unsignedVc: Omit<VerifiableCredential<BatchReleaseSubject>, 'proof'> = {
@@ -133,7 +142,11 @@ export class VerifiableCredentialService {
 
     const fullSubject: CarrierAccreditationSubject = {
       id: `did:ethr:${carrierDidAddress}`,
-      ...subject,
+      carrierName: subject.carrierName,
+      gdpLicenseNumber: subject.gdpLicenseNumber,
+      authorizedVehicleFleet: subject.authorizedVehicleFleet,
+      fipsHsmEnabled: subject.fipsHsmEnabled,
+      jurisdiction: subject.jurisdiction,
     };
 
     const unsignedVc: Omit<VerifiableCredential<CarrierAccreditationSubject>, 'proof'> = {
