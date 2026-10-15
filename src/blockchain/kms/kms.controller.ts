@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Param } from '@nestjs/common';
-import { KmsSignerService, KmsKeyMetadata, KmsSignatureResult } from './kms-signer.service';
+import { KmsSignerService } from './kms-signer.service';
+import type { KmsKeyMetadata, KmsSignatureResult } from './kms-signer.service';
 
 @Controller('blockchain/kms')
 export class KmsController {
