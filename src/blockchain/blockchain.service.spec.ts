@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BlockchainService } from './blockchain.service';
 import { BlockchainController } from './blockchain.controller';
+import { IpfsService } from './ipfs/ipfs.service';
+import { ZkProofEngine } from './zk/zk-proof.engine';
+import { PaymasterService } from './account-abstraction/paymaster.service';
+import { SoulboundAccreditationService } from './sbt/soulbound-accreditation.service';
 
 describe('BlockchainModule Integration', () => {
     let service: BlockchainService;
@@ -9,7 +13,13 @@ describe('BlockchainModule Integration', () => {
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             controllers: [BlockchainController],
-            providers: [BlockchainService],
+            providers: [
+                BlockchainService,
+                IpfsService,
+                ZkProofEngine,
+                PaymasterService,
+                SoulboundAccreditationService,
+            ],
         }).compile();
 
         service = module.get<BlockchainService>(BlockchainService);
