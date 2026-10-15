@@ -46,6 +46,7 @@ PharmaTrace-ES implements real-world enterprise design patterns directly within 
 | **GS1 Digital Link 1.2 Resolver** | Web Standard Identification | `src/blockchain/digital-link/digital-link.service.ts`<br>`src/blockchain/digital-link/digital-link.controller.ts` | Resolves standard GS1 URIs (`/01/{gtin}/21/{serial}`) to RFC 9264 linksets (e-Leaflets, CoA, EPCIS 2.0, DID accreditation, and on-chain burn checks) with Modulo-10 checksum validation. |
 | **Dynamic NFC (AES-128 CMAC)** | Anti-Cloning Hardware Security | `src/iot/nfc/nfc-verification.service.ts` | Validates NTAG 424 DNA Secure Unique NFC tokens with dynamic CMAC cryptographic digests and strictly monotonic counter progression. |
 | **The Graph Decentralized Indexer** | Query Optimization & Indexing | `subgraph/schema.graphql`<br>`subgraph/subgraph.yaml`<br>`subgraph/src/mapping.ts` | High-performance GraphQL indexing protocol mapping emitted contract events into queryable relational entities. |
+| **Regulatory Multi-Sig & Timelock** | Decentralized Governance / Security | `contracts/PharmaGovernanceTimelock.sol`<br>`src/blockchain/governance/governance-timelock.service.ts` | M-of-N threshold quorum across regulatory authorities (FDA, EMA, MHRA) with mandatory 48-hour timelock delay before executing sensitive parameter changes, license revocations, or circuit pauses. |
 | **Singleton** | Creational | NestJS IoC Dependency Injection | Services (`@Injectable()`) are managed as thread-safe singletons across the entire application runtime. |
 
 All design patterns are verified with automated unit tests in `src/patterns.spec.ts`.
@@ -73,7 +74,8 @@ pharma-trace-backend/
 ├── contracts/
 │   ├── PharmaTraceAttestation.sol     # Multi-Role Attestations and Soulbound SBTs
 │   ├── PharmaDigitalTwin.sol          # Physical-Digital Twin with Anti-Recirculation Burn
-│   └── PharmaEscrowEngine.sol         # DvP Escrow Engine with Chainlink Automation
+│   ├── PharmaEscrowEngine.sol         # DvP Escrow Engine with Chainlink Automation
+│   └── PharmaGovernanceTimelock.sol   # Multi-Sig Threshold Quorum & Timelock Controller
 ├── scripts/
 │   ├── compile.js                     # Multi-Contract Solidity Optimizer & Compiler
 │   └── deploy.js                      # Deployment Pipeline
