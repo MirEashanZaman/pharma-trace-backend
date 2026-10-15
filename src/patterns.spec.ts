@@ -28,6 +28,7 @@ import { NfcVerificationService } from './iot/nfc/nfc-verification.service';
 import { DigitalLinkService } from './blockchain/digital-link/digital-link.service';
 import { EpcisJsonLdService } from './blockchain/epcis/epcis-jsonld.service';
 import { GovernanceTimelockService, GovernanceProposalStatus } from './blockchain/governance/governance-timelock.service';
+import { KmsSignerService } from './blockchain/kms/kms-signer.service';
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
 import { ethers } from 'ethers';
@@ -1336,6 +1337,85 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
 
             expect(cancelled.status).toBe(GovernanceProposalStatus.CANCELLED);
             expect(cancelled.cancellationReason).toContain('Discovered invalid batch identifier');
+        });
+    });
+
+    describe('24. Hardware Security Module (HSM) Cloud KMS Signer Pattern', () => {
+        const kmsService = new KmsSignerService();
+        const testKeyId = 'kms-pharma-mfg-01';
+
+        it('should list initialized enterprise KMS hardware enclave keys', () => {
+            const keys = kmsService.listKeys();
+            expect(keys.length).toBeGreaterThanOrEqual(2);
+            const mfgKey = kmsService.getKeyMetadata(testKeyId);
+            expect(mfgKey.label).toContain('Manufacturing Signer');
+            expect(mfgKey.fipsLevel).toBe('FIPS 140-2 Level 3');
+            expect(mfgKey.enabled).toBe(true);
+            expect(mfgKey.ethereumAddress).toBeDefined();
+        });
+
+        it('should parse ASN.1 DER encoded ECDSA signature into canonical r and s components', () => {
+            const rawDer = Buffer.from(
+                '3045022100e4cd0d4136d728bed3e53c4bb21af75cc65966847898522392f8723d2d8c85b402201234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+                'hex',
+            );
+            const parsed = kmsService.parseAsn1DerSignature(rawDer);
+            expect(parsed.r).toHaveLength(66);
+            expect(parsed.s).toHaveLength(66);
+            expect(parsed.r.startsWith('0x')).toBe(true);
+            expect(parsed.s.startsWith('0x')).toBe(true);
+        });
+
+        it('should normalize high-s values to enforce EIP-2 malleability compliance', () => {
+            const SECP256K1_N = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
+            const highS = SECP256K1_N - 5000n;
+            const normalized = kmsService.normalizeLowS(highS);
+            expect(normalized).toBe(5000n);
+
+            const lowS = 12345n;
+            expect(kmsService.normalizeLowS(lowS)).toBe(12345n);
+        });
+
+        it('should sign a 32-byte hash digest and compute deterministic Ethereum v parameter', async () => {
+            const digest = ethers.keccak256(ethers.toUtf8Bytes('BATCH-RELEASE-AUTH-2026'));
+            const sigResult = await kmsService.signDigest(testKeyId, digest);
+
+            expect(sigResult.keyId).toBe(testKeyId);
+            expect(sigResult.digest).toBe(digest);
+            expect([27, 28]).toContain(sigResult.v);
+            expect(sigResult.serializedSignature).toHaveLength(132);
+
+            const meta = kmsService.getKeyMetadata(testKeyId);
+            expect(sigResult.signerAddress.toLowerCase()).toBe(meta.ethereumAddress.toLowerCase());
+
+            const recovered = ethers.recoverAddress(digest, sigResult.serializedSignature);
+            expect(recovered.toLowerCase()).toBe(meta.ethereumAddress.toLowerCase());
+        });
+
+        it('should sign an EIP-191 personal message and verify authentic signature without plaintext key exposure', async () => {
+            const message = 'FDA-OVERSIGHT-RELEASE-BATCH-0099';
+            const sigResult = await kmsService.signMessage('kms-pharma-reg-01', message);
+
+            const isValid = await kmsService.verifyKmsSignature(message, sigResult.serializedSignature, 'kms-pharma-reg-01');
+            expect(isValid).toBe(true);
+
+            const isInvalidMessage = await kmsService.verifyKmsSignature('TAMPERED-MESSAGE', sigResult.serializedSignature, 'kms-pharma-reg-01');
+            expect(isInvalidMessage).toBe(false);
+        });
+
+        it('should allow registering custom HSM keys and reject invalid digest lengths', async () => {
+            const customKey = kmsService.registerCustomKey(
+                'kms-custom-logistics-01',
+                'Cold Chain Logistics Signer',
+                'GOOGLE_CLOUD_KMS',
+                '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            );
+            expect(customKey.keyId).toBe('kms-custom-logistics-01');
+            expect(customKey.hsmProvider).toBe('GOOGLE_CLOUD_KMS');
+
+            await expect(kmsService.signDigest('kms-custom-logistics-01', '0x1234')).rejects.toThrow(
+                'Signing digest must be precisely 32 bytes',
+            );
         });
     });
 });
