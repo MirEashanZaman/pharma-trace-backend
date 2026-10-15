@@ -1,4 +1,4 @@
-export interface EpcisQueryParametersDto {
+export class EpcisQueryParametersDto {
   EQ_bizStep?: string;
   EQ_action?: 'OBSERVE' | 'ADD' | 'DELETE' | string;
   EQ_disposition?: string;
