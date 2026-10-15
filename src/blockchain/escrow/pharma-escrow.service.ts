@@ -1,5 +1,10 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { keccak256, toUtf8Bytes, getAddress, isAddress } from 'ethers';
+import {
+  SensorConsensusEngine,
+  CheckpointCluster,
+  EscrowConsensusReport,
+} from '../../iot/consensus/sensor-consensus.engine';
 
 export enum EscrowState {
   FUNDED = 'FUNDED',
@@ -35,6 +40,10 @@ export interface CreateEscrowDto {
 export class PharmaEscrowService {
   private readonly logger = new Logger(PharmaEscrowService.name);
   private readonly escrows: Map<string, EscrowRecord> = new Map();
+
+  constructor(
+    private readonly consensusEngine: SensorConsensusEngine = new SensorConsensusEngine(),
+  ) {}
 
   async createEscrowOrder(dto: CreateEscrowDto): Promise<EscrowRecord> {
     if (!isAddress(dto.buyer) || !isAddress(dto.seller)) {
@@ -117,6 +126,75 @@ export class PharmaEscrowService {
     return {
       success: true,
       released: true,
+      order,
+    };
+  }
+
+  async evaluateAndReleaseWithConsensus(
+    orderId: string,
+    custodyAccepted: boolean,
+    clusters: CheckpointCluster[],
+    minTemp: number = 2.0,
+    maxTemp: number = 8.0,
+    outlierTolerance: number = 2.5,
+  ): Promise<{
+    success: boolean;
+    released: boolean;
+    reason?: string;
+    report: EscrowConsensusReport;
+    order: EscrowRecord;
+  }> {
+    const order = await this.getEscrow(orderId);
+
+    if (order.status !== EscrowState.FUNDED) {
+      throw new BadRequestException(`Escrow ${orderId} is already in ${order.status} state`);
+    }
+
+    const report = this.consensusEngine.evaluateTransitSeries(
+      orderId,
+      clusters,
+      minTemp,
+      maxTemp,
+      outlierTolerance,
+    );
+
+    if (!custodyAccepted) {
+      return {
+        success: false,
+        released: false,
+        reason: 'Buyer has not signed EIP-712 custody acceptance handshake',
+        report,
+        order,
+      };
+    }
+
+    if (!report.isSettlementApproved) {
+      order.status = EscrowState.DISPUTED;
+      order.coldChainCompliant = false;
+      this.escrows.set(orderId, order);
+      return {
+        success: false,
+        released: false,
+        reason: report.settlementReason,
+        report,
+        order,
+      };
+    }
+
+    order.coldChainCompliant = true;
+    order.custodyAccepted = true;
+    order.status = EscrowState.RELEASED;
+    order.settlementTxHash = keccak256(toUtf8Bytes(`SETTLE_CONSENSUS:${orderId}:${Date.now()}`));
+
+    this.escrows.set(orderId, order);
+    this.logger.log(
+      `Escrow ${orderId} released via multi-sensor consensus to seller ${order.seller} (${order.amountEth} ETH)`,
+    );
+
+    return {
+      success: true,
+      released: true,
+      report,
       order,
     };
   }
