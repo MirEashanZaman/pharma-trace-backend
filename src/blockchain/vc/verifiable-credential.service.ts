@@ -4,8 +4,9 @@ import {
   Wallet,
   keccak256,
   toUtf8Bytes,
-  recoverAddress,
   computeAddress,
+  verifyMessage,
+  hashMessage,
 } from 'ethers';
 import {
   VerifiableCredential,
@@ -52,14 +53,26 @@ export class VerifiableCredentialService {
     return keccak256(toUtf8Bytes(canonicalJson));
   }
 
+  private getIssuerAddress(issuerWalletOrKey: Wallet | SigningKey | any): string {
+    if (issuerWalletOrKey && typeof issuerWalletOrKey.address === 'string') {
+      return issuerWalletOrKey.address;
+    }
+    return computeAddress((issuerWalletOrKey as SigningKey).publicKey);
+  }
+
+  private async signDigest(issuerWalletOrKey: Wallet | SigningKey | any, digest: string): Promise<string> {
+    if (issuerWalletOrKey && typeof issuerWalletOrKey.signMessage === 'function') {
+      return await issuerWalletOrKey.signMessage(digest);
+    }
+    const messageHash = hashMessage(digest);
+    return (issuerWalletOrKey as SigningKey).sign(messageHash).serialized;
+  }
+
   async issueBatchReleaseCredential(
     subject: Omit<BatchReleaseSubject, 'id'>,
     issuerWalletOrKey: Wallet | SigningKey,
   ): Promise<VerifiableCredential<BatchReleaseSubject>> {
-    const issuerAddress =
-      issuerWalletOrKey instanceof Wallet
-        ? issuerWalletOrKey.address
-        : computeAddress(issuerWalletOrKey.publicKey);
+    const issuerAddress = this.getIssuerAddress(issuerWalletOrKey);
 
     const issuerDid = `did:ethr:${issuerAddress}`;
     const credentialId = `urn:uuid:batch-vc-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -104,10 +117,7 @@ export class VerifiableCredentialService {
 
     const canonical = this.canonicalizeForSigning(unsignedVc);
     const digest = this.computeDigest(canonical);
-    const signature =
-      issuerWalletOrKey instanceof Wallet
-        ? await issuerWalletOrKey.signMessage(digest)
-        : issuerWalletOrKey.sign(digest).serialized;
+    const signature = await this.signDigest(issuerWalletOrKey, digest);
 
     const vc: VerifiableCredential<BatchReleaseSubject> = {
       ...unsignedVc,
@@ -131,10 +141,7 @@ export class VerifiableCredentialService {
     carrierDidAddress: string,
     issuerWalletOrKey: Wallet | SigningKey,
   ): Promise<VerifiableCredential<CarrierAccreditationSubject>> {
-    const issuerAddress =
-      issuerWalletOrKey instanceof Wallet
-        ? issuerWalletOrKey.address
-        : computeAddress(issuerWalletOrKey.publicKey);
+    const issuerAddress = this.getIssuerAddress(issuerWalletOrKey);
 
     const issuerDid = `did:ethr:${issuerAddress}`;
     const credentialId = `urn:uuid:carrier-vc-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -174,10 +181,7 @@ export class VerifiableCredentialService {
 
     const canonical = this.canonicalizeForSigning(unsignedVc);
     const digest = this.computeDigest(canonical);
-    const signature =
-      issuerWalletOrKey instanceof Wallet
-        ? await issuerWalletOrKey.signMessage(digest)
-        : issuerWalletOrKey.sign(digest).serialized;
+    const signature = await this.signDigest(issuerWalletOrKey, digest);
 
     const vc: VerifiableCredential<CarrierAccreditationSubject> = {
       ...unsignedVc,
@@ -220,7 +224,7 @@ export class VerifiableCredentialService {
     const digest = this.computeDigest(canonical);
 
     try {
-      const recoveredSigner = recoverAddress(digest, vc.proof.proofValue);
+      const recoveredSigner = verifyMessage(digest, vc.proof.proofValue);
       const expectedSigner = vc.issuer.ethereumAddress;
 
       if (recoveredSigner.toLowerCase() !== expectedSigner.toLowerCase()) {
@@ -251,12 +255,13 @@ export class VerifiableCredentialService {
 
   async createVerifiablePresentation(
     credentials: VerifiableCredential[],
-    holderWallet: Wallet,
+    holderWallet: Wallet | any,
     challenge: string,
     domain: string = 'pharmatrace.org',
   ): Promise<VerifiablePresentation> {
     const presentationId = `urn:uuid:vp-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    const holderDid = `did:ethr:${holderWallet.address}`;
+    const holderAddress = this.getIssuerAddress(holderWallet);
+    const holderDid = `did:ethr:${holderAddress}`;
 
     const unsignedVp: Omit<VerifiablePresentation, 'proof'> = {
       '@context': ['https://www.w3.org/2018/credentials/v1'],
@@ -269,7 +274,7 @@ export class VerifiableCredentialService {
     const canonical = this.canonicalizeForSigning(unsignedVp);
     const presentationPayload = `${canonical}:${challenge}:${domain}`;
     const digest = this.computeDigest(presentationPayload);
-    const signature = await holderWallet.signMessage(digest);
+    const signature = await this.signDigest(holderWallet, digest);
 
     return {
       ...unsignedVp,
@@ -307,7 +312,7 @@ export class VerifiableCredentialService {
     const digest = this.computeDigest(presentationPayload);
 
     try {
-      const recoveredHolder = recoverAddress(digest, vp.proof.proofValue);
+      const recoveredHolder = verifyMessage(digest, vp.proof.proofValue);
       const expectedHolderAddress = vp.holder.replace('did:ethr:', '');
       if (recoveredHolder.toLowerCase() !== expectedHolderAddress.toLowerCase()) {
         reasons.push(`Holder presentation signature mismatch: recovered ${recoveredHolder}`);
