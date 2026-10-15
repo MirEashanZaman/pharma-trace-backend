@@ -5,9 +5,14 @@ import {
     Get,
     Param,
     Header,
+    UseGuards,
 } from '@nestjs/common';
 
 import { DrugsService } from './drugs.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../auth/entities/user.entity';
 
 @Controller('drugs')
 export class DrugsController {
@@ -15,6 +20,8 @@ export class DrugsController {
         private readonly drugsService: DrugsService,
     ) { }
 
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.MANUFACTURER, UserRole.ADMIN)
     @Post()
     createDrug(
         @Body()
