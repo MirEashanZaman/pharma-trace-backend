@@ -690,8 +690,8 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
                 callGasLimit: 200000,
                 verificationGasLimit: 100000,
                 preVerificationGas: 50000,
-                maxFeePerGas: BigInt(2000000000),
-                maxPriorityFeePerGas: BigInt(1000000000),
+                maxFeePerGas: 2000000000,
+                maxPriorityFeePerGas: 1000000000,
             };
 
             const sponsorship = await paymaster.sponsorUserOperation(userOp, 'packBatch');
@@ -701,6 +701,7 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             const verification = paymaster.validateSponsoredOperation({
                 ...userOp,
                 paymasterAndData: sponsorship.paymasterAndData,
+                signature: '0x',
             });
             expect(verification.isValid).toBe(true);
         });
@@ -714,8 +715,8 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
                 callGasLimit: 200000,
                 verificationGasLimit: 100000,
                 preVerificationGas: 50000,
-                maxFeePerGas: BigInt(2000000000),
-                maxPriorityFeePerGas: BigInt(1000000000),
+                maxFeePerGas: 2000000000,
+                maxPriorityFeePerGas: 1000000000,
             };
 
             await expect(
