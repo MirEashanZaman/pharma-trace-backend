@@ -67,11 +67,11 @@ export class PaymasterService {
             throw new Error(`Action '${actionName}' is not authorized for corporate gas sponsorship`);
         }
 
-        const validAfter = Math.floor(Date.now() / 1000);
+        const validAfter = Math.max(0, Math.floor(Date.now() / 1000) - 60);
         const validUntil = validAfter + 3600;
         const totalGas = userOp.callGasLimit + userOp.verificationGasLimit + userOp.preVerificationGas;
 
-        const sponsorshipPayload = `${this.paymasterSigner.address}:${validUntil}:${validAfter}:${userOp.sender}`;
+        const sponsorshipPayload = `${this.paymasterSigner.address.toLowerCase()}:${validUntil}:${validAfter}:${userOp.sender.toLowerCase()}`;
         const paymasterSignature = await this.paymasterSigner.signMessage(sponsorshipPayload);
         const paymasterAndData = `${this.paymasterSigner.address.toLowerCase()}:${validUntil}:${validAfter}:${paymasterSignature}`;
 
@@ -113,7 +113,7 @@ export class PaymasterService {
             };
         }
 
-        const sponsorshipPayload = `${paymasterAddress}:${validUntil}:${validAfter}:${userOp.sender}`;
+        const sponsorshipPayload = `${paymasterAddress.toLowerCase()}:${validUntil}:${validAfter}:${userOp.sender.toLowerCase()}`;
         try {
             const recovered = verifyMessage(sponsorshipPayload, signature);
             if (recovered.toLowerCase() !== this.paymasterSigner.address.toLowerCase()) {
