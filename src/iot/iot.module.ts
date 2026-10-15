@@ -5,6 +5,7 @@ import { IotGateway } from './iot.gateway';
 import { DrugEventsModule } from '../events/drug-events.module';
 import { HardwareOracleService } from './oracle/hardware-oracle.service';
 import { NfcVerificationService } from './nfc/nfc-verification.service';
+import { SensorConsensusEngine } from './consensus/sensor-consensus.engine';
 
 @Module({
     imports: [
@@ -18,12 +19,14 @@ import { NfcVerificationService } from './nfc/nfc-verification.service';
         IotGateway,
         HardwareOracleService,
         NfcVerificationService,
+        SensorConsensusEngine,
     ],
     exports: [
         IotGateway,
         IotService,
         HardwareOracleService,
         NfcVerificationService,
+        SensorConsensusEngine,
     ],
 })
 export class IotModule { }
