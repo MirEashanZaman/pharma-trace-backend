@@ -10,6 +10,7 @@ import {
 
 import { IotService } from './iot.service';
 import { HardwareOracleService } from './oracle/hardware-oracle.service';
+import { NfcVerificationService } from './nfc/nfc-verification.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('iot')
@@ -17,6 +18,7 @@ export class IotController {
     constructor(
         private readonly iotService: IotService,
         private readonly hardwareOracleService: HardwareOracleService,
+        private readonly nfcVerificationService: NfcVerificationService,
     ) { }
 
     @Get('sensor')
@@ -80,5 +82,19 @@ export class IotController {
         },
     ) {
         return this.iotService.simulateTelemetry(data);
+    }
+
+    @Post('nfc/verify')
+    verifyNfcScan(@Body() body: { tagUid: string; tapCounter: number; cmacHex: string }) {
+        const result = this.nfcVerificationService.verifyScan(body.tagUid, body.tapCounter, body.cmacHex);
+        if (!result.isValid) {
+            throw new BadRequestException(result.reason);
+        }
+        return result;
+    }
+
+    @Post('nfc/simulate-tap/:tagUid')
+    simulateNfcTap(@Param('tagUid') tagUid: string) {
+        return this.nfcVerificationService.generateSimulatedTagTap(tagUid);
     }
 }
