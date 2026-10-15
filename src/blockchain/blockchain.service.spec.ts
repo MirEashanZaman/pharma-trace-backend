@@ -5,6 +5,9 @@ import { IpfsService } from './ipfs/ipfs.service';
 import { ZkProofEngine } from './zk/zk-proof.engine';
 import { PaymasterService } from './account-abstraction/paymaster.service';
 import { SoulboundAccreditationService } from './sbt/soulbound-accreditation.service';
+import { DigitalTwinService } from './digital-twin/digital-twin.service';
+import { PharmaEscrowService } from './escrow/pharma-escrow.service';
+import { DidResolverService } from './did/did-resolver.service';
 
 describe('BlockchainModule Integration', () => {
     let service: BlockchainService;
@@ -19,6 +22,9 @@ describe('BlockchainModule Integration', () => {
                 ZkProofEngine,
                 PaymasterService,
                 SoulboundAccreditationService,
+                DigitalTwinService,
+                PharmaEscrowService,
+                DidResolverService,
             ],
         }).compile();
 
