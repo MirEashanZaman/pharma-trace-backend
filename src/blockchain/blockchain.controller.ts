@@ -16,6 +16,7 @@ import { SoulboundAccreditationService } from './sbt/soulbound-accreditation.ser
 import { DigitalTwinService } from './digital-twin/digital-twin.service';
 import { PharmaEscrowService } from './escrow/pharma-escrow.service';
 import { DidResolverService } from './did/did-resolver.service';
+import { EpcisJsonLdService } from './epcis/epcis-jsonld.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -69,6 +70,7 @@ export class BlockchainController {
         private readonly digitalTwinService: DigitalTwinService,
         private readonly escrowService: PharmaEscrowService,
         private readonly didResolverService: DidResolverService,
+        private readonly epcisJsonLdService: EpcisJsonLdService,
     ) {}
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -236,6 +238,32 @@ export class BlockchainController {
     verifyDidSignature(@Body() body: { did: string; message: string; signature: string }) {
         const valid = this.didResolverService.verifyDidSignature(body.did, body.message, body.signature);
         return { valid, did: body.did };
+    }
+
+    @Post('epcis/commission')
+    commissionEpcis(@Body() body: any) {
+        const event = this.epcisJsonLdService.buildCommissioningEvent(body);
+        const doc = this.epcisJsonLdService.wrapDocument([event]);
+        return this.epcisJsonLdService.canonicalizeAndHash(doc);
+    }
+
+    @Post('epcis/aggregate')
+    aggregateEpcis(@Body() body: any) {
+        const event = this.epcisJsonLdService.buildAggregationEvent(body);
+        const doc = this.epcisJsonLdService.wrapDocument([event]);
+        return this.epcisJsonLdService.canonicalizeAndHash(doc);
+    }
+
+    @Post('epcis/dispense')
+    dispenseEpcis(@Body() body: any) {
+        const event = this.epcisJsonLdService.buildDispenseEvent(body);
+        const doc = this.epcisJsonLdService.wrapDocument([event]);
+        return this.epcisJsonLdService.canonicalizeAndHash(doc);
+    }
+
+    @Post('epcis/canonicalize')
+    canonicalizeDocument(@Body() doc: any) {
+        return this.epcisJsonLdService.canonicalizeAndHash(doc);
     }
 }
 
