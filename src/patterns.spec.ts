@@ -27,6 +27,7 @@ import { DidResolverService } from './blockchain/did/did-resolver.service';
 import { NfcVerificationService } from './iot/nfc/nfc-verification.service';
 import { DigitalLinkService } from './blockchain/digital-link/digital-link.service';
 import { EpcisJsonLdService } from './blockchain/epcis/epcis-jsonld.service';
+import { EpcisQueryService } from './blockchain/epcis/epcis-query.service';
 import { GovernanceTimelockService, GovernanceProposalStatus } from './blockchain/governance/governance-timelock.service';
 import { KmsSignerService } from './blockchain/kms/kms-signer.service';
 import {
@@ -1714,7 +1715,118 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             ).rejects.toThrow('Custody handover blocked by W3C Presentation Exchange');
         });
     });
+
+    describe('27. Standard GS1 EPCIS 2.0 REST Query Protocol & OpenAPI Pattern', () => {
+        const jsonLdService = new EpcisJsonLdService();
+        const epcisQueryService = new EpcisQueryService(jsonLdService);
+
+        it('should query commissioning events with EQ_bizStep filter', () => {
+            const result = epcisQueryService.queryEvents({
+                EQ_bizStep: 'urn:epcglobal:cbv:bizstep:commissioning',
+            });
+
+            expect(result.document.type).toBe('EPCISQueryDocument');
+            expect(result.document.schemaVersion).toBe('2.0');
+            expect(result.document.epcisBody.queryResults.queryName).toBe('SimpleEventQuery');
+            expect(result.document.epcisBody.queryResults.resultsBody.eventList.length).toBeGreaterThanOrEqual(1);
+
+            const commEvent = result.document.epcisBody.queryResults.resultsBody.eventList[0];
+            expect(commEvent.bizStep).toBe('urn:epcglobal:cbv:bizstep:commissioning');
+            expect(commEvent.action).toBe('ADD');
+        });
+
+        it('should query events with MATCH_epc filter across SGTIN serial and SSCC', () => {
+            const serialResult = epcisQueryService.queryEvents({
+                MATCH_epc: 'SN-2026-AMOX-001',
+            });
+
+            expect(serialResult.totalCount).toBeGreaterThanOrEqual(1);
+            const event = serialResult.document.epcisBody.queryResults.resultsBody.eventList[0];
+            const hasMatch =
+                event.epcList?.some((epc: string) => epc.includes('SN-2026-AMOX-001')) ||
+                event.childEPCs?.some((epc: string) => epc.includes('SN-2026-AMOX-001'));
+            expect(hasMatch).toBe(true);
+
+            const ssccResult = epcisQueryService.queryEvents({
+                MATCH_epc: '003000188992000001',
+            });
+            expect(ssccResult.totalCount).toBeGreaterThanOrEqual(1);
+        });
+
+        it('should filter events by temporal boundaries using GE_eventTime and LE_eventTime', () => {
+            const now = new Date();
+            const future = new Date(now.getTime() + 86400000);
+            const wayPast = new Date(now.getTime() - 86400000 * 7);
+
+            const pastResult = epcisQueryService.queryEvents({
+                GE_eventTime: wayPast.toISOString(),
+                LE_eventTime: future.toISOString(),
+            });
+            expect(pastResult.totalCount).toBeGreaterThanOrEqual(1);
+
+            const emptyResult = epcisQueryService.queryEvents({
+                GE_eventTime: future.toISOString(),
+            });
+            expect(emptyResult.totalCount).toBe(0);
+        });
+
+        it('should capture enterprise EPCIS 2.0 JSON-LD events from SAP ATTP / TraceLink ERP gateway', () => {
+            const dispenseEvent = jsonLdService.buildDispenseEvent({
+                gtin: '00300018899201',
+                serialNumber: 'SN-2026-AMOX-ERP-09',
+                pharmacyGln: '0844514000999',
+            });
+
+            const captureJob = epcisQueryService.capture([dispenseEvent]);
+            expect(captureJob.success).toBe(true);
+            expect(captureJob.eventCount).toBe(1);
+            expect(captureJob.captureErrorCount).toBe(0);
+            expect(captureJob.captureID).toContain('urn:uuid:cap-');
+
+            const queryResult = epcisQueryService.queryEvents({
+                EQ_bizStep: 'dispensing',
+            });
+            expect(queryResult.totalCount).toBeGreaterThanOrEqual(1);
+            const found = queryResult.document.epcisBody.queryResults.resultsBody.eventList.find(
+                (e: any) => e.bizStep === 'urn:epcglobal:cbv:bizstep:dispensing',
+            );
+            expect(found).toBeDefined();
+            expect(found.action).toBe('DELETE');
+        });
+
+        it('should paginate query results with perPage and nextPageToken', () => {
+            const page1 = epcisQueryService.queryEvents({
+                perPage: 1,
+            });
+
+            expect(page1.document.epcisBody.queryResults.resultsBody.eventList.length).toBe(1);
+            expect(page1.nextPageToken).toBeDefined();
+
+            const page2 = epcisQueryService.queryEvents({
+                perPage: 1,
+                nextPageToken: page1.nextPageToken,
+            });
+
+            expect(page2.document.epcisBody.queryResults.resultsBody.eventList.length).toBe(1);
+            expect(page2.document.epcisBody.queryResults.resultsBody.eventList[0].eventID).not.toBe(
+                page1.document.epcisBody.queryResults.resultsBody.eventList[0].eventID,
+            );
+        });
+
+        it('should provide OpenAPI 3.0 specification for ERP gateway client generation', () => {
+            const openApi = epcisQueryService.getOpenApiSpec();
+            expect(openApi.openapi).toBe('3.0.3');
+            expect(openApi.paths['/epcis/events']).toBeDefined();
+            expect(openApi.paths['/epcis/capture']).toBeDefined();
+            expect(openApi.components.schemas.EPCISQueryDocument).toBeDefined();
+
+            const version = epcisQueryService.getEpcisVersion();
+            expect(version.version).toBe('2.0');
+            expect(version.cbvVersion).toBe('2.0');
+        });
+    });
 });
+
 
 
 
