@@ -20,6 +20,7 @@ import { GovernanceTimelockService } from './governance/governance-timelock.serv
 import { GovernanceController } from './governance/governance.controller';
 import { KmsSignerService } from './kms/kms-signer.service';
 import { KmsController } from './kms/kms.controller';
+import { SensorConsensusEngine } from '../iot/consensus/sensor-consensus.engine';
 
 @Module({
     controllers: [BlockchainController, DigitalLinkController, GovernanceController, KmsController],
@@ -41,6 +42,7 @@ import { KmsController } from './kms/kms.controller';
         EpcisJsonLdService,
         GovernanceTimelockService,
         KmsSignerService,
+        SensorConsensusEngine,
     ],
     exports: [
         BlockchainService,
@@ -60,6 +62,7 @@ import { KmsController } from './kms/kms.controller';
         EpcisJsonLdService,
         GovernanceTimelockService,
         KmsSignerService,
+        SensorConsensusEngine,
     ],
 })
 export class BlockchainModule {}
