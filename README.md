@@ -51,6 +51,7 @@ PharmaTrace-ES implements real-world enterprise design patterns directly within 
 | **Medianized Multi-Sensor Consensus** | Fault Tolerance / Consensus | `src/iot/consensus/sensor-consensus.engine.ts`<br>`src/blockchain/escrow/pharma-escrow.service.ts` | Quorum-based Byzantine fault tolerance evaluating multi-probe cold-chain telemetry via statistical median filtering, isolating aberrant hardware sensor spikes without invalidating legitimate commercial delivery escrows. |
 | **W3C Verifiable Credentials (VC) & Presentation Exchange** | Decentralized Identity / Compliance | `src/blockchain/vc/verifiable-credential.service.ts`<br>`src/blockchain/vc/status-list-2021.registry.ts`<br>`src/blockchain/vc/vc.controller.ts` | Cryptographic JSON-LD / JWT Verifiable Credentials for Qualified Persons (QP) certifying GMP batch release and carrier accreditation, W3C StatusList2021 on-chain bitstring revocation registry with keccak256 state hashing, and Presentation Exchange (PEX 2.0) verification gating physical custody handovers. |
 | **Standard GS1 EPCIS 2.0 REST Query & OpenAPI** | Enterprise Interoperability / Standards | `src/blockchain/epcis/epcis-query.service.ts`<br>`src/blockchain/epcis/epcis-query.controller.ts`<br>`src/blockchain/epcis/epcis-query.dto.ts` | Standard `/epcis/events` query protocol implementing GS1 CBV filtering parameters (`EQ_bizStep`, `MATCH_epc`, `GE_eventTime`, `LE_eventTime`), event capture pipeline, pagination, and OpenAPI 3.0 specification for drop-in interoperability with enterprise ERP gateways (SAP ATTP, TraceLink). |
+| **Carrier Collateral Staking & Automated Slashing** | Economic Security / Smart Escrow | `contracts/CarrierStakingEscrow.sol`<br>`src/blockchain/escrow/carrier-staking.service.ts`<br>`src/blockchain/escrow/carrier-staking.controller.ts` | ERC-20 security deposit staking for cold-chain carriers requiring collateral bonds per shipment, coupled with autonomous bond slashing upon multi-sensor consensus temperature excursions to directly indemnify pharmaceutical manufacturers. |
 | **Singleton** | Creational | NestJS IoC Dependency Injection | Services (`@Injectable()`) are managed as thread-safe singletons across the entire application runtime. |
 
 All design patterns are verified with automated unit tests in `src/patterns.spec.ts`.
@@ -62,6 +63,7 @@ All design patterns are verified with automated unit tests in `src/patterns.spec
 PharmaTrace-ES enforces enterprise application and Web3 security standards across the system perimeter:
 
 * **EIP-4361 SIWE Challenge-Nonce Authentication**: Server-issued, time-bounded challenge nonces prevent wallet signature replay attacks on Web3 login routes (`/auth/challenge/:walletAddress`).
+* **Carrier Collateral Staking & Slashing Enforcement**: Requires accredited carriers to deposit ERC-20 security bonds that are autonomously liquidated and transferred to manufacturers upon multi-sensor consensus breach detection.
 * **W3C Verifiable Credentials & StatusList2021 Custody Gating**: Enforces Qualified Person (QP) cryptographic credential verification and dynamic on-chain bitstring revocation checking prior to approving physical custody handovers.
 * **Hardware Security Module (HSM) Cloud KMS Signer**: Private keys never touch application memory or environment variables; signing operations use FIPS 140-2 Level 3 cloud enclaves with canonical low-s normalization and deterministic address recovery.
 * **Privilege Escalation Immunity**: Strict server-side role enforcement prevents clients from claiming administrative privileges during self-registration.
@@ -78,6 +80,7 @@ PharmaTrace-ES enforces enterprise application and Web3 security standards acros
 ```text
 pharma-trace-backend/
 ├── contracts/
+│   ├── CarrierStakingEscrow.sol       # Collateral Staking & Slashing Smart Escrow
 │   ├── PharmaTraceAttestation.sol     # Multi-Role Attestations and Soulbound SBTs
 │   ├── PharmaDigitalTwin.sol          # Physical-Digital Twin with Anti-Recirculation Burn
 │   ├── PharmaEscrowEngine.sol         # DvP Escrow Engine with Chainlink Automation
