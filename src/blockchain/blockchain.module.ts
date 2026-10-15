@@ -26,6 +26,8 @@ import { VerifiableCredentialService } from './vc/verifiable-credential.service'
 import { VcController } from './vc/vc.controller';
 import { EpcisQueryService } from './epcis/epcis-query.service';
 import { EpcisQueryController } from './epcis/epcis-query.controller';
+import { CarrierStakingService } from './escrow/carrier-staking.service';
+import { CarrierStakingController } from './escrow/carrier-staking.controller';
 
 @Module({
     controllers: [
@@ -35,6 +37,7 @@ import { EpcisQueryController } from './epcis/epcis-query.controller';
         KmsController,
         VcController,
         EpcisQueryController,
+        CarrierStakingController,
     ],
     providers: [
         BlockchainService,
@@ -58,6 +61,7 @@ import { EpcisQueryController } from './epcis/epcis-query.controller';
         StatusList2021Registry,
         VerifiableCredentialService,
         EpcisQueryService,
+        CarrierStakingService,
     ],
     exports: [
         BlockchainService,
@@ -81,6 +85,7 @@ import { EpcisQueryController } from './epcis/epcis-query.controller';
         StatusList2021Registry,
         VerifiableCredentialService,
         EpcisQueryService,
+        CarrierStakingService,
     ],
 })
 export class BlockchainModule {}
