@@ -9,7 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { EpcisQueryService } from './epcis-query.service';
 import { EpcisQueryParametersDto } from './epcis-query.dto';
 
