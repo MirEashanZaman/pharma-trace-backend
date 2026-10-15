@@ -76,8 +76,23 @@ contract PharmaTraceAttestation {
         address indexed sender
     );
 
+    bool public paused;
+
+    event Paused(address indexed account);
+    event Unpaused(address indexed account);
+
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can perform this action");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract is currently paused");
+        _;
+    }
+
+    modifier whenPaused() {
+        require(paused, "Contract is not paused");
         _;
     }
 
@@ -87,6 +102,20 @@ contract PharmaTraceAttestation {
         roles[MANUFACTURER_ROLE][msg.sender] = true;
         roles[DISTRIBUTOR_ROLE][msg.sender] = true;
         roles[DISPENSER_ROLE][msg.sender] = true;
+    }
+
+    function pause() external {
+        require(msg.sender == owner || roles[REGULATOR_ROLE][msg.sender], "Unauthorized to pause contract");
+        require(!paused, "Already paused");
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external {
+        require(msg.sender == owner || roles[REGULATOR_ROLE][msg.sender], "Unauthorized to unpause contract");
+        require(paused, "Not paused");
+        paused = false;
+        emit Unpaused(msg.sender);
     }
 
     function grantRole(bytes32 role, address account) external onlyOwner {
@@ -108,7 +137,7 @@ contract PharmaTraceAttestation {
         string calldata drugSerialNumber,
         string calldata eventType,
         string calldata metadataUri
-    ) external returns (bool) {
+    ) external whenNotPaused returns (bool) {
         require(
             msg.sender == owner ||
             roles[MANUFACTURER_ROLE][msg.sender] ||
@@ -148,7 +177,7 @@ contract PharmaTraceAttestation {
         bytes32 merkleRoot,
         uint32 batchSize,
         string calldata ipfsCid
-    ) external returns (bool) {
+    ) external whenNotPaused returns (bool) {
         require(
             msg.sender == owner ||
             roles[MANUFACTURER_ROLE][msg.sender] ||
@@ -223,7 +252,7 @@ contract PharmaTraceAttestation {
         );
     }
 
-    function revokeBatch(bytes32 merkleRoot, string calldata reason) external {
+    function revokeBatch(bytes32 merkleRoot, string calldata reason) external whenNotPaused {
         BatchRecord storage record = batches[merkleRoot];
         require(record.blockTimestamp > 0, "Batch not found");
         require(
@@ -236,7 +265,7 @@ contract PharmaTraceAttestation {
         emit BatchRevoked(merkleRoot, msg.sender, block.timestamp, reason);
     }
 
-    function revokeAttestation(bytes32 dataHash, string calldata reason) external {
+    function revokeAttestation(bytes32 dataHash, string calldata reason) external whenNotPaused {
         Attestation storage record = attestations[dataHash];
         require(record.blockTimestamp > 0, "Attestation not found");
         require(
@@ -285,5 +314,26 @@ contract PharmaTraceAttestation {
         returns (bytes32[] memory)
     {
         return drugHistory[drugSerialNumber];
+    }
+
+    function getDrugHistoryPaginated(
+        string calldata drugSerialNumber,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (bytes32[] memory items, uint256 total) {
+        bytes32[] storage allHashes = drugHistory[drugSerialNumber];
+        total = allHashes.length;
+        if (offset >= total || limit == 0) {
+            return (new bytes32[](0), total);
+        }
+        uint256 count = limit;
+        if (offset + count > total) {
+            count = total - offset;
+        }
+        items = new bytes32[](count);
+        for (uint256 i = 0; i < count; i++) {
+            items[i] = allHashes[offset + i];
+        }
+        return (items, total);
     }
 }
