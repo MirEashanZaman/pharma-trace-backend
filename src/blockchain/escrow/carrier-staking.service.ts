@@ -135,19 +135,17 @@ export class CarrierStakingService {
     }
 
     const carrier = this.getAccount(bond.carrierAddress);
-    const consensusReport = this.consensusEngine.evaluateConsensusAcrossJourney(
+    const consensusReport = this.consensusEngine.evaluateTransitSeries(
       shipmentId,
       sensorClusters,
       bond.minTemp,
       bond.maxTemp,
     );
 
-    const medianTemp =
-      consensusReport.checkpointResults.length > 0
-        ? consensusReport.checkpointResults[0].medianTemperature
-        : 0;
+    const medianTemp = consensusReport.overallMedianTemperature;
+    const reportHash = keccak256(toUtf8Bytes(JSON.stringify(consensusReport)));
 
-    if (consensusReport.approved) {
+    if (consensusReport.isSettlementApproved) {
       carrier.lockedCollateral -= bond.bondAmount;
       carrier.availableCollateral = carrier.totalStaked - carrier.lockedCollateral;
       carrier.lastUpdated = Date.now();
@@ -156,7 +154,7 @@ export class CarrierStakingService {
       bond.slashedAmount = 0;
       bond.resolvedAt = Date.now();
       bond.resolutionReason = 'Multi-sensor consensus verified compliant cold-chain handover';
-      bond.consensusReportHash = consensusReport.reportHash;
+      bond.consensusReportHash = reportHash;
 
       this.logger.log(`Released ${bond.bondAmount} bond for carrier ${bond.carrierAddress} on shipment ${shipmentId}`);
 
@@ -166,9 +164,9 @@ export class CarrierStakingService {
         bondAmount: bond.bondAmount,
         slashedAmount: 0,
         reason: bond.resolutionReason,
-        isolatedFaultsCount: consensusReport.totalIsolatedFaults,
+        isolatedFaultsCount: consensusReport.isolatedSensorFaults,
         clusterMedianTemp: medianTemp,
-        consensusReportHash: consensusReport.reportHash,
+        consensusReportHash: reportHash,
       };
     }
 
@@ -185,13 +183,13 @@ export class CarrierStakingService {
     const currentIndemnity = this.indemnityLedger.get(bond.manufacturerAddress) || 0;
     this.indemnityLedger.set(bond.manufacturerAddress, currentIndemnity + slashedAmount);
 
-    const reason = `Autonomous bond slashing: multi-sensor consensus rejected cold-chain telemetry. Breaches: ${consensusReport.breachCount}`;
+    const reason = `Autonomous bond slashing: multi-sensor consensus rejected cold-chain telemetry. Excursions: ${consensusReport.excursionCheckpoints}`;
 
     bond.status = 'SLASHED';
     bond.slashedAmount = slashedAmount;
     bond.resolvedAt = Date.now();
     bond.resolutionReason = reason;
-    bond.consensusReportHash = consensusReport.reportHash;
+    bond.consensusReportHash = reportHash;
 
     this.logger.warn(
       `Slashed ${slashedAmount} from carrier ${bond.carrierAddress}. Indemnified manufacturer ${bond.manufacturerAddress} for shipment ${shipmentId}`,
@@ -204,9 +202,9 @@ export class CarrierStakingService {
       slashedAmount,
       indemnityRecipient: bond.manufacturerAddress,
       reason,
-      isolatedFaultsCount: consensusReport.totalIsolatedFaults,
+      isolatedFaultsCount: consensusReport.isolatedSensorFaults,
       clusterMedianTemp: medianTemp,
-      consensusReportHash: consensusReport.reportHash,
+      consensusReportHash: reportHash,
     };
   }
 
