@@ -6,6 +6,10 @@ import { RpcLoadBalancer } from './load-balancer/rpc-load-balancer';
 import { BatchAttestationEngine } from './merkle/batch-attestation.engine';
 import { Eip712CustodyService } from './eip712/eip712-custody';
 import { EpcisAggregator } from './epcis/epcis-aggregator';
+import { IpfsService } from './ipfs/ipfs.service';
+import { ZkProofEngine } from './zk/zk-proof.engine';
+import { PaymasterService } from './account-abstraction/paymaster.service';
+import { SoulboundAccreditationService } from './sbt/soulbound-accreditation.service';
 
 @Module({
     controllers: [BlockchainController],
@@ -16,6 +20,10 @@ import { EpcisAggregator } from './epcis/epcis-aggregator';
         BatchAttestationEngine,
         Eip712CustodyService,
         EpcisAggregator,
+        IpfsService,
+        ZkProofEngine,
+        PaymasterService,
+        SoulboundAccreditationService,
     ],
     exports: [
         BlockchainService,
@@ -24,6 +32,10 @@ import { EpcisAggregator } from './epcis/epcis-aggregator';
         BatchAttestationEngine,
         Eip712CustodyService,
         EpcisAggregator,
+        IpfsService,
+        ZkProofEngine,
+        PaymasterService,
+        SoulboundAccreditationService,
     ],
 })
 export class BlockchainModule {}
