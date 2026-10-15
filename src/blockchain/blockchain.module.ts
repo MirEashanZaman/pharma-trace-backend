@@ -18,9 +18,11 @@ import { DigitalLinkController } from './digital-link/digital-link.controller';
 import { EpcisJsonLdService } from './epcis/epcis-jsonld.service';
 import { GovernanceTimelockService } from './governance/governance-timelock.service';
 import { GovernanceController } from './governance/governance.controller';
+import { KmsSignerService } from './kms/kms-signer.service';
+import { KmsController } from './kms/kms.controller';
 
 @Module({
-    controllers: [BlockchainController, DigitalLinkController, GovernanceController],
+    controllers: [BlockchainController, DigitalLinkController, GovernanceController, KmsController],
     providers: [
         BlockchainService,
         BlockchainFacade,
@@ -38,6 +40,7 @@ import { GovernanceController } from './governance/governance.controller';
         DigitalLinkService,
         EpcisJsonLdService,
         GovernanceTimelockService,
+        KmsSignerService,
     ],
     exports: [
         BlockchainService,
@@ -56,6 +59,7 @@ import { GovernanceController } from './governance/governance.controller';
         DigitalLinkService,
         EpcisJsonLdService,
         GovernanceTimelockService,
+        KmsSignerService,
     ],
 })
 export class BlockchainModule {}
