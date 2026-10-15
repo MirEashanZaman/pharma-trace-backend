@@ -204,6 +204,18 @@ export class BlockchainController {
         );
     }
 
+    @Post('escrow/evaluate-consensus')
+    async evaluateEscrowWithConsensus(@Body() body: any) {
+        return this.escrowService.evaluateAndReleaseWithConsensus(
+            body.orderId,
+            body.custodyAccepted,
+            body.checkpointClusters,
+            body.minTemp,
+            body.maxTemp,
+            body.outlierTolerance,
+        );
+    }
+
     @Post('escrow/refund')
     async refundEscrow(@Body() body: { orderId: string; reason: string }) {
         return this.escrowService.triggerBreachRefund(body.orderId, body.reason);
