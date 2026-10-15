@@ -13,6 +13,9 @@ import { IpfsService } from './ipfs/ipfs.service';
 import { ZkProofEngine } from './zk/zk-proof.engine';
 import { PaymasterService } from './account-abstraction/paymaster.service';
 import { SoulboundAccreditationService } from './sbt/soulbound-accreditation.service';
+import { DigitalTwinService } from './digital-twin/digital-twin.service';
+import { PharmaEscrowService } from './escrow/pharma-escrow.service';
+import { DidResolverService } from './did/did-resolver.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -63,6 +66,9 @@ export class BlockchainController {
         private readonly zkProofEngine: ZkProofEngine,
         private readonly paymasterService: PaymasterService,
         private readonly soulboundService: SoulboundAccreditationService,
+        private readonly digitalTwinService: DigitalTwinService,
+        private readonly escrowService: PharmaEscrowService,
+        private readonly didResolverService: DidResolverService,
     ) {}
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -153,5 +159,74 @@ export class BlockchainController {
     async verifyBadge(@Param('tokenId') tokenId: string) {
         return this.soulboundService.verifyBadge(tokenId);
     }
+
+    @Post('twin/mint')
+    async mintTwin(@Body() dto: any) {
+        return this.digitalTwinService.mintDigitalTwin(dto);
+    }
+
+    @Post('twin/transfer')
+    async transferTwinCustody(
+        @Body() body: { serialNumber: string; fromAddress: string; toAddress: string }
+    ) {
+        return this.digitalTwinService.transferCustody(body.serialNumber, body.fromAddress, body.toAddress);
+    }
+
+    @Post('twin/burn')
+    async burnTwinOnDispense(
+        @Body() body: { serialNumber: string; dispenserAddress: string }
+    ) {
+        return this.digitalTwinService.burnOnDispense(body.serialNumber, body.dispenserAddress);
+    }
+
+    @Get('twin/verify/:serialNumber')
+    async verifyTwin(@Param('serialNumber') serialNumber: string) {
+        return this.digitalTwinService.verifyAuthenticity(serialNumber);
+    }
+
+    @Post('escrow/create')
+    async createEscrow(@Body() dto: any) {
+        return this.escrowService.createEscrowOrder(dto);
+    }
+
+    @Post('escrow/release')
+    async releaseEscrow(
+        @Body() body: { orderId: string; custodyAccepted: boolean; coldChainReadings: number[]; minTemp?: number; maxTemp?: number }
+    ) {
+        return this.escrowService.evaluateAndReleaseEscrow(
+            body.orderId,
+            body.custodyAccepted,
+            body.coldChainReadings,
+            body.minTemp,
+            body.maxTemp,
+        );
+    }
+
+    @Post('escrow/refund')
+    async refundEscrow(@Body() body: { orderId: string; reason: string }) {
+        return this.escrowService.triggerBreachRefund(body.orderId, body.reason);
+    }
+
+    @Get('escrow/:orderId')
+    async getEscrow(@Param('orderId') orderId: string) {
+        return this.escrowService.getEscrow(orderId);
+    }
+
+    @Get('did/:did')
+    async resolveDid(@Param('did') did: string) {
+        return this.didResolverService.resolveDid(did);
+    }
+
+    @Get('did/address/:address')
+    async resolveDidByAddress(@Param('address') address: string) {
+        return this.didResolverService.resolveAddress(address);
+    }
+
+    @Post('did/verify-signature')
+    verifyDidSignature(@Body() body: { did: string; message: string; signature: string }) {
+        const valid = this.didResolverService.verifyDidSignature(body.did, body.message, body.signature);
+        return { valid, did: body.did };
+    }
 }
+
 
