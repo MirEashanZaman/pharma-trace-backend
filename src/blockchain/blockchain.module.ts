@@ -15,6 +15,7 @@ import { PharmaEscrowService } from './escrow/pharma-escrow.service';
 import { DidResolverService } from './did/did-resolver.service';
 import { DigitalLinkService } from './digital-link/digital-link.service';
 import { DigitalLinkController } from './digital-link/digital-link.controller';
+import { EpcisJsonLdService } from './epcis/epcis-jsonld.service';
 
 @Module({
     controllers: [BlockchainController, DigitalLinkController],
@@ -33,6 +34,7 @@ import { DigitalLinkController } from './digital-link/digital-link.controller';
         PharmaEscrowService,
         DidResolverService,
         DigitalLinkService,
+        EpcisJsonLdService,
     ],
     exports: [
         BlockchainService,
@@ -49,6 +51,7 @@ import { DigitalLinkController } from './digital-link/digital-link.controller';
         PharmaEscrowService,
         DidResolverService,
         DigitalLinkService,
+        EpcisJsonLdService,
     ],
 })
 export class BlockchainModule {}
