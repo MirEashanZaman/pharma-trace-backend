@@ -21,9 +21,18 @@ import { GovernanceController } from './governance/governance.controller';
 import { KmsSignerService } from './kms/kms-signer.service';
 import { KmsController } from './kms/kms.controller';
 import { SensorConsensusEngine } from '../iot/consensus/sensor-consensus.engine';
+import { StatusList2021Registry } from './vc/status-list-2021.registry';
+import { VerifiableCredentialService } from './vc/verifiable-credential.service';
+import { VcController } from './vc/vc.controller';
 
 @Module({
-    controllers: [BlockchainController, DigitalLinkController, GovernanceController, KmsController],
+    controllers: [
+        BlockchainController,
+        DigitalLinkController,
+        GovernanceController,
+        KmsController,
+        VcController,
+    ],
     providers: [
         BlockchainService,
         BlockchainFacade,
@@ -43,6 +52,8 @@ import { SensorConsensusEngine } from '../iot/consensus/sensor-consensus.engine'
         GovernanceTimelockService,
         KmsSignerService,
         SensorConsensusEngine,
+        StatusList2021Registry,
+        VerifiableCredentialService,
     ],
     exports: [
         BlockchainService,
@@ -63,6 +74,8 @@ import { SensorConsensusEngine } from '../iot/consensus/sensor-consensus.engine'
         GovernanceTimelockService,
         KmsSignerService,
         SensorConsensusEngine,
+        StatusList2021Registry,
+        VerifiableCredentialService,
     ],
 })
 export class BlockchainModule {}
