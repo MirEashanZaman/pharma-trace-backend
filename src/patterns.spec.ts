@@ -26,6 +26,7 @@ import { PharmaEscrowService, EscrowState } from './blockchain/escrow/pharma-esc
 import { DidResolverService } from './blockchain/did/did-resolver.service';
 import { NfcVerificationService } from './iot/nfc/nfc-verification.service';
 import { DigitalLinkService } from './blockchain/digital-link/digital-link.service';
+import { EpcisJsonLdService } from './blockchain/epcis/epcis-jsonld.service';
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
 import { ethers } from 'ethers';
@@ -1153,6 +1154,102 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             const refunded = await escrowService.performAutomationUpkeep(expiredOrder.orderId, 2);
             expect(refunded.status).toBe(EscrowState.REFUNDED);
             expect(refunded.refundReason).toContain('Delivery SLA timeout refund');
+        });
+    });
+
+    describe('22. GS1 EPCIS 2.0 JSON-LD CBV Canonical Document Generator & Hasher', () => {
+        const epcisJsonLd = new EpcisJsonLdService();
+        const testGtin = '00844514000015';
+        const testSerial1 = 'SN-EPCIS-101';
+        const testSerial2 = 'SN-EPCIS-102';
+        const mfgGln = '0844514000001';
+        const pharmaGln = '0844514000056';
+        const testSscc = '008445140000005018';
+
+        it('should build standard EPCIS 2.0 commissioning ObjectEvent', () => {
+            const event = epcisJsonLd.buildCommissioningEvent({
+                gtin: testGtin,
+                serialNumbers: [testSerial1, testSerial2],
+                locationGln: mfgGln,
+                readPointGln: mfgGln,
+            });
+
+            expect(event.type).toBe('ObjectEvent');
+            expect(event.action).toBe('ADD');
+            expect(event.bizStep).toBe('urn:epcglobal:cbv:bizstep:commissioning');
+            expect(event.disposition).toBe('urn:epcglobal:cbv:disp:active');
+            expect(event.epcList).toHaveLength(2);
+            expect(event.epcList?.[0]).toBe(`urn:epc:id:sgtin:${testGtin}.${testSerial1}`);
+            expect(event.bizLocation.id).toBe(`urn:epc:id:sgln:${mfgGln}.0`);
+        });
+
+        it('should build standard EPCIS 2.0 packing AggregationEvent', () => {
+            const childEpcs = [
+                `urn:epc:id:sgtin:${testGtin}.${testSerial1}`,
+                `urn:epc:id:sgtin:${testGtin}.${testSerial2}`,
+            ];
+            const event = epcisJsonLd.buildAggregationEvent({
+                parentSscc: testSscc,
+                childEpcs,
+                locationGln: mfgGln,
+                readPointGln: mfgGln,
+            });
+
+            expect(event.type).toBe('AggregationEvent');
+            expect(event.action).toBe('ADD');
+            expect(event.bizStep).toBe('urn:epcglobal:cbv:bizstep:packing');
+            expect(event.parentID).toBe(`urn:epc:id:sscc:${testSscc}`);
+            expect(event.childEPCs).toEqual(childEpcs);
+        });
+
+        it('should build standard EPCIS 2.0 shipping event with business transaction reference', () => {
+            const epcs = [`urn:epc:id:sscc:${testSscc}`];
+            const event = epcisJsonLd.buildShippingEvent({
+                epcs,
+                locationGln: mfgGln,
+                readPointGln: mfgGln,
+                orderReference: 'PO-2026-NOVARTIS-991',
+            });
+
+            expect(event.bizStep).toBe('urn:epcglobal:cbv:bizstep:shipping');
+            expect(event.disposition).toBe('urn:epcglobal:cbv:disp:in_transit');
+            expect(event.bizTransactionList?.[0].bizTransaction).toBe('PO-2026-NOVARTIS-991');
+        });
+
+        it('should build standard EPCIS 2.0 clinical dispense ObjectEvent', () => {
+            const event = epcisJsonLd.buildDispenseEvent({
+                gtin: testGtin,
+                serialNumber: testSerial1,
+                pharmacyGln: pharmaGln,
+            });
+
+            expect(event.action).toBe('DELETE');
+            expect(event.bizStep).toBe('urn:epcglobal:cbv:bizstep:dispensing');
+            expect(event.disposition).toBe('urn:epcglobal:cbv:disp:dispensed');
+            expect(event.bizLocation.id).toBe(`urn:epc:id:sgln:${pharmaGln}.0`);
+        });
+
+        it('should wrap events into EPCISDocument and compute deterministic canonical SHA-256 hash', () => {
+            const event = epcisJsonLd.buildCommissioningEvent({
+                gtin: testGtin,
+                serialNumbers: [testSerial1],
+                locationGln: mfgGln,
+                readPointGln: mfgGln,
+                timestamp: new Date('2026-10-15T12:00:00Z'),
+            });
+            const doc = epcisJsonLd.wrapDocument([event], 'urn:uuid:test-epcis-doc-1234');
+            const canonicalResult = epcisJsonLd.canonicalizeAndHash(doc);
+
+            expect(canonicalResult.document['@context']).toContain(
+                'https://ref.gs1.org/standards/epcis/2.0.0/epcis-context.jsonld',
+            );
+            expect(canonicalResult.eventHash.startsWith('0x')).toBe(true);
+            expect(canonicalResult.eventHash.length).toBe(66);
+            expect(canonicalResult.eventCount).toBe(1);
+
+            const reversedDoc = JSON.parse(JSON.stringify(doc));
+            const rehashed = epcisJsonLd.canonicalizeAndHash(reversedDoc);
+            expect(rehashed.eventHash).toBe(canonicalResult.eventHash);
         });
     });
 });
