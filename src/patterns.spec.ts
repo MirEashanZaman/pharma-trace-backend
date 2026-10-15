@@ -29,6 +29,10 @@ import { DigitalLinkService } from './blockchain/digital-link/digital-link.servi
 import { EpcisJsonLdService } from './blockchain/epcis/epcis-jsonld.service';
 import { GovernanceTimelockService, GovernanceProposalStatus } from './blockchain/governance/governance-timelock.service';
 import { KmsSignerService } from './blockchain/kms/kms-signer.service';
+import {
+    SensorConsensusEngine,
+    CheckpointCluster,
+} from './iot/consensus/sensor-consensus.engine';
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
 import { ethers } from 'ethers';
@@ -1415,6 +1419,144 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
 
             await expect(kmsService.signDigest('kms-custom-logistics-01', '0x1234')).rejects.toThrow(
                 'Signing digest must be precisely 32 bytes',
+            );
+        });
+    });
+
+    describe('25. Medianized Multi-Sensor Consensus Pattern', () => {
+        const consensusEngine = new SensorConsensusEngine();
+        const escrowService = new PharmaEscrowService(consensusEngine);
+        const buyerWallet = ethers.Wallet.createRandom();
+        const sellerWallet = ethers.Wallet.createRandom();
+
+        it('should calculate accurate median for both odd and even sensor counts', () => {
+            const oddReadings = [4.1, 4.8, 4.3];
+            expect(consensusEngine.calculateMedian(oddReadings)).toBe(4.3);
+
+            const evenReadings = [4.1, 4.2, 4.6, 4.7];
+            expect(consensusEngine.calculateMedian(evenReadings)).toBe(4.4);
+        });
+
+        it('should resist single-sensor hardware failure and isolate rogue outlier without tripping excursion', () => {
+            const cluster: CheckpointCluster = {
+                checkpointId: 'CHK-RECON-01',
+                timestamp: Date.now(),
+                readings: [
+                    { sensorId: 'probe-alpha', temperature: 4.1 },
+                    { sensorId: 'probe-beta', temperature: 4.2 },
+                    { sensorId: 'probe-gamma', temperature: 4.3 },
+                    { sensorId: 'probe-faulty-delta', temperature: 32.8 },
+                ],
+            };
+
+            const evaluation = consensusEngine.evaluateCheckpoint(cluster, 2.0, 8.0, 2.5);
+            expect(evaluation.medianTemperature).toBe(4.25);
+            expect(evaluation.isCompliant).toBe(true);
+            expect(evaluation.healthySensorCount).toBe(3);
+            expect(evaluation.faultySensors).toHaveLength(1);
+            expect(evaluation.faultySensors[0].sensorId).toBe('probe-faulty-delta');
+            expect(evaluation.faultySensors[0].reason).toBe('HIGH_OUTLIER');
+            expect(evaluation.confidenceScore).toBe(75);
+        });
+
+        it('should evaluate full transit journey and approve escrow settlement despite isolated transient faults', async () => {
+            const order = await escrowService.createEscrowOrder({
+                buyer: buyerWallet.address,
+                seller: sellerWallet.address,
+                amountEth: 4.5,
+                drugSerialNumber: 'SN-CONSENSUS-BATCH-01',
+            });
+
+            const clusters: CheckpointCluster[] = [
+                {
+                    checkpointId: 'CHK-DEPARTURE-AIRPORT',
+                    timestamp: Date.now() - 7200000,
+                    readings: [
+                        { sensorId: 'probe-1', temperature: 4.0 },
+                        { sensorId: 'probe-2', temperature: 4.2 },
+                        { sensorId: 'probe-3', temperature: 4.1 },
+                    ],
+                },
+                {
+                    checkpointId: 'CHK-IN-FLIGHT-REEFER',
+                    timestamp: Date.now() - 3600000,
+                    readings: [
+                        { sensorId: 'probe-1', temperature: 4.3 },
+                        { sensorId: 'probe-2', temperature: 4.4 },
+                        { sensorId: 'probe-3', temperature: -12.5 },
+                    ],
+                },
+                {
+                    checkpointId: 'CHK-DESTINATION-HOSPITAL',
+                    timestamp: Date.now(),
+                    readings: [
+                        { sensorId: 'probe-1', temperature: 4.2 },
+                        { sensorId: 'probe-2', temperature: 4.3 },
+                        { sensorId: 'probe-3', temperature: 4.1 },
+                    ],
+                },
+            ];
+
+            const result = await escrowService.evaluateAndReleaseWithConsensus(
+                order.orderId,
+                true,
+                clusters,
+                2.0,
+                8.0,
+            );
+
+            expect(result.success).toBe(true);
+            expect(result.released).toBe(true);
+            expect(result.order.status).toBe(EscrowState.RELEASED);
+            expect(result.order.settlementTxHash).toBeDefined();
+            expect(result.report.isolatedSensorFaults).toBe(1);
+            expect(result.report.isSettlementApproved).toBe(true);
+        });
+
+        it('should dispute escrow payout when genuine multi-sensor temperature excursion occurs', async () => {
+            const order = await escrowService.createEscrowOrder({
+                buyer: buyerWallet.address,
+                seller: sellerWallet.address,
+                amountEth: 2.0,
+                drugSerialNumber: 'SN-CONSENSUS-EXCURSION-02',
+            });
+
+            const clusters: CheckpointCluster[] = [
+                {
+                    checkpointId: 'CHK-FAILED-COMPRESSOR',
+                    timestamp: Date.now(),
+                    readings: [
+                        { sensorId: 'probe-1', temperature: 13.5 },
+                        { sensorId: 'probe-2', temperature: 14.1 },
+                        { sensorId: 'probe-3', temperature: 13.8 },
+                    ],
+                },
+            ];
+
+            const result = await escrowService.evaluateAndReleaseWithConsensus(
+                order.orderId,
+                true,
+                clusters,
+                2.0,
+                8.0,
+            );
+
+            expect(result.success).toBe(false);
+            expect(result.released).toBe(false);
+            expect(result.order.status).toBe(EscrowState.DISPUTED);
+            expect(result.report.isSettlementApproved).toBe(false);
+            expect(result.reason).toContain('Cold-chain breach detected');
+        });
+
+        it('should reject evaluation when checkpoint cluster fails minimum Byzantine quorum', () => {
+            const singleSensorCluster: CheckpointCluster = {
+                checkpointId: 'CHK-INSUFFICIENT-QUORUM',
+                timestamp: Date.now(),
+                readings: [{ sensorId: 'probe-lonely', temperature: 4.2 }],
+            };
+
+            expect(() => consensusEngine.evaluateCheckpoint(singleSensorCluster)).toThrow(
+                'requires at least 2 independent sensor readings',
             );
         });
     });
