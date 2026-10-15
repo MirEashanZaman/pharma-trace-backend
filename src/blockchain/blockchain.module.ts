@@ -16,9 +16,11 @@ import { DidResolverService } from './did/did-resolver.service';
 import { DigitalLinkService } from './digital-link/digital-link.service';
 import { DigitalLinkController } from './digital-link/digital-link.controller';
 import { EpcisJsonLdService } from './epcis/epcis-jsonld.service';
+import { GovernanceTimelockService } from './governance/governance-timelock.service';
+import { GovernanceController } from './governance/governance.controller';
 
 @Module({
-    controllers: [BlockchainController, DigitalLinkController],
+    controllers: [BlockchainController, DigitalLinkController, GovernanceController],
     providers: [
         BlockchainService,
         BlockchainFacade,
@@ -35,6 +37,7 @@ import { EpcisJsonLdService } from './epcis/epcis-jsonld.service';
         DidResolverService,
         DigitalLinkService,
         EpcisJsonLdService,
+        GovernanceTimelockService,
     ],
     exports: [
         BlockchainService,
@@ -52,6 +55,7 @@ import { EpcisJsonLdService } from './epcis/epcis-jsonld.service';
         DidResolverService,
         DigitalLinkService,
         EpcisJsonLdService,
+        GovernanceTimelockService,
     ],
 })
 export class BlockchainModule {}
