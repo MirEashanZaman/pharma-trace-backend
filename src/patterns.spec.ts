@@ -25,6 +25,7 @@ import { DigitalTwinService, DigitalTwinStatus } from './blockchain/digital-twin
 import { PharmaEscrowService, EscrowState } from './blockchain/escrow/pharma-escrow.service';
 import { DidResolverService } from './blockchain/did/did-resolver.service';
 import { NfcVerificationService } from './iot/nfc/nfc-verification.service';
+import { DigitalLinkService } from './blockchain/digital-link/digital-link.service';
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
 import { ethers } from 'ethers';
@@ -1012,6 +1013,149 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             expect(verification.reason).toContain('Cryptographic CMAC signature mismatch');
         });
     });
+
+    describe('20. GS1 Digital Link 1.2 Web Standard Resolver & Modulo-10 Checksum Engine', () => {
+        const twinService = new DigitalTwinService();
+        const digitalLinkService = new DigitalLinkService(twinService);
+        const testGtin = '00844514000015';
+        const testSerial = 'SN-GS1-MOD10-8801';
+        const testHolder = ethers.Wallet.createRandom().address;
+
+        it('should correctly validate GS1 Modulo-10 checksum for standard 14-digit GTINs', () => {
+            expect(digitalLinkService.validateGtinChecksum(testGtin)).toBe(true);
+            expect(digitalLinkService.validateGtinChecksum('00844514000019')).toBe(false);
+            expect(digitalLinkService.validateGtinChecksum('12345')).toBe(false);
+        });
+
+        it('should parse standard GS1 Digital Link URI containing AI 01, AI 21, AI 10, and AI 17', () => {
+            const rawUri = `https://id.gs1.org/01/${testGtin}/21/${testSerial}?10=LOT-2026A&17=281231`;
+            const parsed = digitalLinkService.parseGs1Uri(rawUri);
+
+            expect(parsed.gtin).toBe(testGtin);
+            expect(parsed.serialNumber).toBe(testSerial);
+            expect(parsed.batchNumber).toBe('LOT-2026A');
+            expect(parsed.expirationDate).toBe('281231');
+        });
+
+        it('should reject malformed GS1 URIs missing required primary identification keys', () => {
+            expect(() => digitalLinkService.parseGs1Uri('https://id.gs1.org/99/invalid/path')).toThrow(
+                'Invalid GS1 Digital Link syntax: must contain /01/{gtin14}/21/{serial}',
+            );
+        });
+
+        it('should build canonical GS1 Digital Link URI from component identifiers', () => {
+            const canonical = digitalLinkService.buildCanonicalUri(testGtin, testSerial, 'LOT-A', '270101');
+            expect(canonical).toBe(`https://id.gs1.org/01/${testGtin}/21/${testSerial}?10=LOT-A&17=270101`);
+        });
+
+        it('should resolve GS1 Digital Link into RFC 9264 compliant multi-linkset and query digital twin status', async () => {
+            await twinService.mintDigitalTwin({
+                gtin: testGtin,
+                batchNumber: 'LOT-2026A',
+                serialNumber: testSerial,
+                expirationDate: Math.floor(Date.now() / 1000) + 86400 * 365,
+                holderAddress: testHolder,
+                ipfsDossierCid: 'bafybeigs1samplelinkset',
+            });
+
+            const linkset = await digitalLinkService.resolveDigitalLink(testGtin, testSerial);
+
+            expect(linkset.anchor).toBe(`https://id.gs1.org/01/${testGtin}/21/${testSerial}`);
+            expect(linkset['gs1:pip']?.[0].title).toContain('Patient Electronic Information Leaflet');
+            expect(linkset['gs1:hasBatchLot']?.[0].href).toContain('LOT-2026A');
+            expect(linkset.blockchainVerification.exists).toBe(true);
+            expect(linkset.blockchainVerification.isAuthentic).toBe(true);
+            expect(linkset.blockchainVerification.isBurned).toBe(false);
+        });
+
+        it('should reflect burned status in GS1 Digital Link resolution upon patient dispense', async () => {
+            await twinService.burnOnDispense(testSerial, testHolder);
+            const linkset = await digitalLinkService.resolveDigitalLink(testGtin, testSerial);
+
+            expect(linkset.blockchainVerification.isBurned).toBe(true);
+            expect(linkset.blockchainVerification.isAuthentic).toBe(false);
+            expect(linkset.blockchainVerification.status).toBe('BURNED');
+        });
+    });
+
+    describe('21. Chainlink Automation & Decentralized Oracle Keepers for Escrow', () => {
+        const escrowService = new PharmaEscrowService();
+        const buyerWallet = ethers.Wallet.createRandom();
+        const sellerWallet = ethers.Wallet.createRandom();
+        let fundedOrderId: string;
+
+        it('should indicate no upkeep needed when escrow conditions are pending', async () => {
+            const order = await escrowService.createEscrowOrder({
+                buyer: buyerWallet.address,
+                seller: sellerWallet.address,
+                amountEth: 10,
+                drugSerialNumber: 'SN-KEEPER-ESCROW-01',
+                timeoutHours: 48,
+            });
+            fundedOrderId = order.orderId;
+
+            const upkeepCheck = await escrowService.checkAutomationUpkeep();
+            expect(upkeepCheck.upkeepNeeded).toBe(false);
+        });
+
+        it('should detect upkeep needed for release once compliance and receipt are fulfilled', async () => {
+            await escrowService.evaluateAndReleaseEscrow(
+                fundedOrderId,
+                true,
+                [4.2, 4.5, 4.8, 5.0],
+                2.0,
+                8.0,
+            );
+
+            const activeOrder = await escrowService.getEscrow(fundedOrderId);
+            expect(activeOrder.status).toBe(EscrowState.RELEASED);
+            expect(activeOrder.coldChainCompliant).toBe(true);
+            expect(activeOrder.custodyAccepted).toBe(true);
+        });
+
+        it('should trigger automated keeper payout via performAutomationUpkeep', async () => {
+            const secondOrder = await escrowService.createEscrowOrder({
+                buyer: buyerWallet.address,
+                seller: sellerWallet.address,
+                amountEth: 5,
+                drugSerialNumber: 'SN-KEEPER-ESCROW-02',
+                timeoutHours: 24,
+            });
+
+            const record = await escrowService.getEscrow(secondOrder.orderId);
+            record.coldChainCompliant = true;
+            record.custodyAccepted = true;
+
+            const upkeepCheck = await escrowService.checkAutomationUpkeep();
+            expect(upkeepCheck.upkeepNeeded).toBe(true);
+            expect(upkeepCheck.orderId).toBe(secondOrder.orderId);
+            expect(upkeepCheck.actionType).toBe(1);
+
+            const settled = await escrowService.performAutomationUpkeep(secondOrder.orderId, 1);
+            expect(settled.status).toBe(EscrowState.RELEASED);
+            expect(settled.settlementTxHash).toBeDefined();
+        });
+
+        it('should trigger automated keeper timeout refund when SLA period expires', async () => {
+            const expiredOrder = await escrowService.createEscrowOrder({
+                buyer: buyerWallet.address,
+                seller: sellerWallet.address,
+                amountEth: 3,
+                drugSerialNumber: 'SN-KEEPER-TIMEOUT-03',
+                timeoutHours: -1,
+            });
+
+            const upkeepCheck = await escrowService.checkAutomationUpkeep();
+            expect(upkeepCheck.upkeepNeeded).toBe(true);
+            expect(upkeepCheck.orderId).toBe(expiredOrder.orderId);
+            expect(upkeepCheck.actionType).toBe(2);
+
+            const refunded = await escrowService.performAutomationUpkeep(expiredOrder.orderId, 2);
+            expect(refunded.status).toBe(EscrowState.REFUNDED);
+            expect(refunded.refundReason).toContain('Delivery SLA timeout refund');
+        });
+    });
 });
+
 
 
