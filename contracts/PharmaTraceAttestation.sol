@@ -1,8 +1,12 @@
-
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-
 contract PharmaTraceAttestation {
+    bytes32 public constant REGULATOR_ROLE = keccak256("REGULATOR_ROLE");
+    bytes32 public constant MANUFACTURER_ROLE = keccak256("MANUFACTURER_ROLE");
+    bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
+    bytes32 public constant DISPENSER_ROLE = keccak256("DISPENSER_ROLE");
+
     struct Attestation {
         bytes32 dataHash;
         string drugSerialNumber;
@@ -10,19 +14,25 @@ contract PharmaTraceAttestation {
         address signer;
         uint256 blockTimestamp;
         bool isRevoked;
-        string metadataUri; 
+        string metadataUri;
     }
 
-    
+    struct BatchRecord {
+        bytes32 merkleRoot;
+        uint32 batchSize;
+        string ipfsCid;
+        address submitter;
+        uint256 blockTimestamp;
+        bool isRevoked;
+    }
+
     mapping(bytes32 => Attestation) public attestations;
-
-    
     mapping(string => bytes32[]) public drugHistory;
+    mapping(bytes32 => BatchRecord) public batches;
+    mapping(bytes32 => mapping(address => bool)) public roles;
 
-    
     address public owner;
 
-    
     event AttestationRegistered(
         bytes32 indexed dataHash,
         string indexed drugSerialNumber,
@@ -39,6 +49,33 @@ contract PharmaTraceAttestation {
         string reason
     );
 
+    event BatchAnchored(
+        bytes32 indexed merkleRoot,
+        uint32 batchSize,
+        string ipfsCid,
+        address indexed submitter,
+        uint256 timestamp
+    );
+
+    event BatchRevoked(
+        bytes32 indexed merkleRoot,
+        address indexed revoker,
+        uint256 timestamp,
+        string reason
+    );
+
+    event RoleGranted(
+        bytes32 indexed role,
+        address indexed account,
+        address indexed sender
+    );
+
+    event RoleRevoked(
+        bytes32 indexed role,
+        address indexed account,
+        address indexed sender
+    );
+
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can perform this action");
         _;
@@ -46,9 +83,26 @@ contract PharmaTraceAttestation {
 
     constructor() {
         owner = msg.sender;
+        roles[REGULATOR_ROLE][msg.sender] = true;
+        roles[MANUFACTURER_ROLE][msg.sender] = true;
+        roles[DISTRIBUTOR_ROLE][msg.sender] = true;
+        roles[DISPENSER_ROLE][msg.sender] = true;
     }
 
-    
+    function grantRole(bytes32 role, address account) external onlyOwner {
+        roles[role][account] = true;
+        emit RoleGranted(role, account, msg.sender);
+    }
+
+    function revokeRole(bytes32 role, address account) external onlyOwner {
+        roles[role][account] = false;
+        emit RoleRevoked(role, account, msg.sender);
+    }
+
+    function hasRole(bytes32 role, address account) external view returns (bool) {
+        return roles[role][account];
+    }
+
     function registerAttestation(
         bytes32 dataHash,
         string calldata drugSerialNumber,
@@ -82,12 +136,97 @@ contract PharmaTraceAttestation {
         return true;
     }
 
-    
+    function anchorBatch(
+        bytes32 merkleRoot,
+        uint32 batchSize,
+        string calldata ipfsCid
+    ) external returns (bool) {
+        require(merkleRoot != bytes32(0), "Invalid Merkle root");
+        require(batchSize > 0, "Batch size must be greater than zero");
+        require(batches[merkleRoot].blockTimestamp == 0, "Batch root already anchored");
+
+        batches[merkleRoot] = BatchRecord({
+            merkleRoot: merkleRoot,
+            batchSize: batchSize,
+            ipfsCid: ipfsCid,
+            submitter: msg.sender,
+            blockTimestamp: block.timestamp,
+            isRevoked: false
+        });
+
+        emit BatchAnchored(
+            merkleRoot,
+            batchSize,
+            ipfsCid,
+            msg.sender,
+            block.timestamp
+        );
+
+        return true;
+    }
+
+    function verifyBatchInclusion(
+        bytes32 leaf,
+        bytes32[] calldata proof,
+        bytes32 merkleRoot
+    ) external pure returns (bool) {
+        bytes32 computedHash = leaf;
+        for (uint256 i = 0; i < proof.length; i++) {
+            bytes32 proofElement = proof[i];
+            if (computedHash <= proofElement) {
+                computedHash = keccak256(abi.encodePacked(computedHash, proofElement));
+            } else {
+                computedHash = keccak256(abi.encodePacked(proofElement, computedHash));
+            }
+        }
+        return computedHash == merkleRoot;
+    }
+
+    function verifyBatch(bytes32 merkleRoot)
+        external
+        view
+        returns (
+            bool exists,
+            bool isValid,
+            uint32 batchSize,
+            string memory ipfsCid,
+            address submitter,
+            uint256 timestamp
+        )
+    {
+        BatchRecord memory record = batches[merkleRoot];
+        if (record.blockTimestamp == 0) {
+            return (false, false, 0, "", address(0), 0);
+        }
+
+        return (
+            true,
+            !record.isRevoked,
+            record.batchSize,
+            record.ipfsCid,
+            record.submitter,
+            record.blockTimestamp
+        );
+    }
+
+    function revokeBatch(bytes32 merkleRoot, string calldata reason) external {
+        BatchRecord storage record = batches[merkleRoot];
+        require(record.blockTimestamp > 0, "Batch not found");
+        require(
+            msg.sender == record.submitter || msg.sender == owner || roles[REGULATOR_ROLE][msg.sender],
+            "Unauthorized to revoke batch"
+        );
+        require(!record.isRevoked, "Already revoked");
+
+        record.isRevoked = true;
+        emit BatchRevoked(merkleRoot, msg.sender, block.timestamp, reason);
+    }
+
     function revokeAttestation(bytes32 dataHash, string calldata reason) external {
         Attestation storage record = attestations[dataHash];
         require(record.blockTimestamp > 0, "Attestation not found");
         require(
-            msg.sender == record.signer || msg.sender == owner,
+            msg.sender == record.signer || msg.sender == owner || roles[REGULATOR_ROLE][msg.sender],
             "Unauthorized to revoke"
         );
         require(!record.isRevoked, "Already revoked");
@@ -97,7 +236,6 @@ contract PharmaTraceAttestation {
         emit AttestationRevoked(dataHash, msg.sender, block.timestamp, reason);
     }
 
-    
     function verifyAttestation(bytes32 dataHash)
         external
         view
@@ -127,7 +265,6 @@ contract PharmaTraceAttestation {
         );
     }
 
-    
     function getDrugHistory(string calldata drugSerialNumber)
         external
         view
