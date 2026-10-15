@@ -1,0 +1,85 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: PharmaDigitalTwin
+    network: mainnet
+    source:
+      address: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      abi: PharmaDigitalTwin
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - DigitalTwin
+        - CustodyTransfer
+      abis:
+        - name: PharmaDigitalTwin
+          file: ../src/blockchain/artifacts/PharmaDigitalTwin.json
+      eventHandlers:
+        - event: ItemMinted(indexed uint256,indexed string,indexed address,string,string)
+          handler: handleItemMinted
+        - event: CustodyTransferred(indexed uint256,indexed address,indexed address,uint256)
+          handler: handleCustodyTransferred
+        - event: ItemBurnedOnDispense(indexed uint256,indexed string,indexed address,uint256)
+          handler: handleItemBurnedOnDispense
+      file: ./src/mapping.ts
+
+  - kind: ethereum
+    name: PharmaEscrowEngine
+    network: mainnet
+    source:
+      address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+      abi: PharmaEscrowEngine
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - EscrowOrder
+      abis:
+        - name: PharmaEscrowEngine
+          file: ../src/blockchain/artifacts/PharmaEscrowEngine.json
+      eventHandlers:
+        - event: EscrowFunded(indexed bytes32,indexed address,indexed address,uint256,string)
+          handler: handleEscrowFunded
+        - event: ComplianceUpdated(indexed bytes32,bool,bool)
+          handler: handleComplianceUpdated
+        - event: EscrowReleased(indexed bytes32,indexed address,uint256)
+          handler: handleEscrowReleased
+        - event: EscrowRefunded(indexed bytes32,indexed address,uint256,string)
+          handler: handleEscrowRefunded
+      file: ./src/mapping.ts
+
+  - kind: ethereum
+    name: PharmaTraceAttestation
+    network: mainnet
+    source:
+      address: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      abi: PharmaTraceAttestation
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Attestation
+        - BatchAnchor
+        - Accreditation
+      abis:
+        - name: PharmaTraceAttestation
+          file: ../src/blockchain/artifacts/PharmaTraceAttestation.json
+      eventHandlers:
+        - event: AttestationRegistered(indexed bytes32,indexed string,string,indexed address,uint256,string)
+          handler: handleAttestationRegistered
+        - event: AttestationRevoked(indexed bytes32,indexed address,uint256,string)
+          handler: handleAttestationRevoked
+        - event: BatchAnchored(indexed bytes32,uint32,string,indexed address,uint256)
+          handler: handleBatchAnchored
+        - event: AccreditationIssued(indexed bytes32,indexed address,indexed address,string,string,uint256,string)
+          handler: handleAccreditationIssued
+      file: ./src/mapping.ts
