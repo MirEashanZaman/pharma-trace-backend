@@ -3,6 +3,7 @@ import {
     UnauthorizedException,
     ConflictException,
     BadRequestException,
+    ForbiddenException,
     OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -131,7 +132,32 @@ export class AuthService implements OnModuleInit {
     }
 
     
+    private readonly activeNonces: Map<string, { nonce: string; expiresAt: number }> = new Map();
+
+    generateChallenge(walletAddress: string): { challenge: string; nonce: string; expiresAt: number } {
+        const normalized = walletAddress.toLowerCase();
+        const nonce = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        const expiresAt = Date.now() + 5 * 60 * 1000;
+        this.activeNonces.set(normalized, { nonce, expiresAt });
+        const challenge = `PharmaTrace Authentication\nWallet: ${normalized}\nNonce: ${nonce}\nIssued At: ${new Date().toISOString()}`;
+        return { challenge, nonce, expiresAt };
+    }
+
     async web3Login(dto: Web3LoginDto) {
+        const normalizedAddress = dto.walletAddress.toLowerCase();
+        const activeNonce = this.activeNonces.get(normalizedAddress);
+
+        if (activeNonce) {
+            if (Date.now() > activeNonce.expiresAt) {
+                this.activeNonces.delete(normalizedAddress);
+                throw new UnauthorizedException('Challenge nonce has expired. Please request a new challenge.');
+            }
+            if (!dto.message.includes(activeNonce.nonce)) {
+                throw new UnauthorizedException('Signed message does not contain active challenge nonce.');
+            }
+            this.activeNonces.delete(normalizedAddress);
+        }
+
         const isValid = this.blockchainService.verifyWalletSignature(
             dto.message,
             dto.signature,
@@ -142,16 +168,20 @@ export class AuthService implements OnModuleInit {
             throw new UnauthorizedException('Invalid cryptographic wallet signature');
         }
 
+        if (dto.role === UserRole.ADMIN) {
+            throw new ForbiddenException('Admin role cannot be self-assigned via Web3 registration');
+        }
+
         let user = await this.userRepository.findOne({
-            where: { walletAddress: dto.walletAddress.toLowerCase() },
+            where: { walletAddress: normalizedAddress },
         });
 
         if (!user) {
-            
+            const assignedRole = dto.role || UserRole.PHARMACY;
             user = this.userRepository.create({
-                email: `${dto.walletAddress.toLowerCase().slice(0, 10)}@wallet.pharma`,
-                walletAddress: dto.walletAddress.toLowerCase(),
-                role: dto.role || UserRole.MANUFACTURER,
+                email: `${normalizedAddress.slice(0, 10)}@wallet.pharma`,
+                walletAddress: normalizedAddress,
+                role: assignedRole,
                 organization: dto.organization || 'Web3 Signer',
             });
             user = await this.userRepository.save(user);
