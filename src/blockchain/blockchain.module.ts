@@ -24,6 +24,8 @@ import { SensorConsensusEngine } from '../iot/consensus/sensor-consensus.engine'
 import { StatusList2021Registry } from './vc/status-list-2021.registry';
 import { VerifiableCredentialService } from './vc/verifiable-credential.service';
 import { VcController } from './vc/vc.controller';
+import { EpcisQueryService } from './epcis/epcis-query.service';
+import { EpcisQueryController } from './epcis/epcis-query.controller';
 
 @Module({
     controllers: [
@@ -32,6 +34,7 @@ import { VcController } from './vc/vc.controller';
         GovernanceController,
         KmsController,
         VcController,
+        EpcisQueryController,
     ],
     providers: [
         BlockchainService,
@@ -54,6 +57,7 @@ import { VcController } from './vc/vc.controller';
         SensorConsensusEngine,
         StatusList2021Registry,
         VerifiableCredentialService,
+        EpcisQueryService,
     ],
     exports: [
         BlockchainService,
@@ -76,6 +80,7 @@ import { VcController } from './vc/vc.controller';
         SensorConsensusEngine,
         StatusList2021Registry,
         VerifiableCredentialService,
+        EpcisQueryService,
     ],
 })
 export class BlockchainModule {}
