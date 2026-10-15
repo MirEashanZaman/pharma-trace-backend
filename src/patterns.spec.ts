@@ -27,6 +27,7 @@ import { DidResolverService } from './blockchain/did/did-resolver.service';
 import { NfcVerificationService } from './iot/nfc/nfc-verification.service';
 import { DigitalLinkService } from './blockchain/digital-link/digital-link.service';
 import { EpcisJsonLdService } from './blockchain/epcis/epcis-jsonld.service';
+import { GovernanceTimelockService, GovernanceProposalStatus } from './blockchain/governance/governance-timelock.service';
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
 import { ethers } from 'ethers';
@@ -1250,6 +1251,91 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             const reversedDoc = JSON.parse(JSON.stringify(doc));
             const rehashed = epcisJsonLd.canonicalizeAndHash(reversedDoc);
             expect(rehashed.eventHash).toBe(canonicalResult.eventHash);
+        });
+    });
+
+    describe('23. Regulatory Multi-Sig Governance & Timelock Controller Pattern', () => {
+        const govService = new GovernanceTimelockService();
+        const fdaWallet = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+        const emaWallet = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC';
+        const unauthorizedWallet = ethers.Wallet.createRandom().address;
+        const targetContract = ethers.Wallet.createRandom().address;
+        let proposalId: string;
+
+        it('should allow authorized health authority guardian to submit a timelocked governance proposal', async () => {
+            govService.configureGovernance(2, 86400);
+
+            const proposal = await govService.createProposal({
+                proposer: fdaWallet,
+                target: targetContract,
+                data: '0x12345678',
+                description: 'Revoke unverified manufacturer accreditation due to GMP non-compliance',
+            });
+
+            expect(proposal.id).toBeDefined();
+            expect(proposal.proposer).toBe(fdaWallet);
+            expect(proposal.status).toBe(GovernanceProposalStatus.QUEUED);
+            expect(proposal.confirmations).toContain(fdaWallet);
+            expect(proposal.confirmations).toHaveLength(1);
+            proposalId = proposal.id;
+        });
+
+        it('should reject proposal submissions from unauthorized entities', async () => {
+            await expect(
+                govService.createProposal({
+                    proposer: unauthorizedWallet,
+                    target: targetContract,
+                    data: '0xdeadbeef',
+                    description: 'Malicious role hijacking attempt',
+                }),
+            ).rejects.toThrow('Proposer is not an authorized regulatory guardian');
+        });
+
+        it('should allow second regulatory guardian to confirm proposal toward threshold', async () => {
+            const confirmed = await govService.confirmProposal(proposalId, emaWallet);
+            expect(confirmed.confirmations).toContain(emaWallet);
+            expect(confirmed.confirmations).toHaveLength(2);
+        });
+
+        it('should reject execution before timelock countdown delay has elapsed', async () => {
+            await expect(govService.executeProposal(proposalId, fdaWallet)).rejects.toThrow(
+                'Timelock delay pending',
+            );
+        });
+
+        it('should execute proposal once threshold confirmations and timelock ETA are satisfied', async () => {
+            const instantProposal = await govService.createProposal({
+                proposer: fdaWallet,
+                target: targetContract,
+                data: '0xaabbccdd',
+                description: 'Emergency supply chain circuit pause',
+                customDelaySeconds: 0,
+            });
+
+            await govService.confirmProposal(instantProposal.id, emaWallet);
+            const execution = await govService.executeProposal(instantProposal.id, fdaWallet);
+
+            expect(execution.success).toBe(true);
+            expect(execution.proposal.status).toBe(GovernanceProposalStatus.EXECUTED);
+            expect(execution.executionTxHash).toBeDefined();
+        });
+
+        it('should allow guardians to cancel a queued proposal before execution', async () => {
+            const cancelableProposal = await govService.createProposal({
+                proposer: fdaWallet,
+                target: targetContract,
+                data: '0x99999999',
+                description: 'Obsolete parameter adjustment',
+            });
+
+            const cancelled = await govService.cancelProposal(
+                cancelableProposal.id,
+                fdaWallet,
+                'Discovered invalid batch identifier in audit',
+            );
+
+            expect(cancelled.status).toBe(GovernanceProposalStatus.CANCELLED);
+            expect(cancelled.cancellationReason).toContain('Discovered invalid batch identifier');
         });
     });
 });
