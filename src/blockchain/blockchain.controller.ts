@@ -207,6 +207,16 @@ export class BlockchainController {
         return this.escrowService.triggerBreachRefund(body.orderId, body.reason);
     }
 
+    @Get('escrow/automation/check')
+    async checkEscrowAutomation() {
+        return this.escrowService.checkAutomationUpkeep();
+    }
+
+    @Post('escrow/automation/perform')
+    async performEscrowAutomation(@Body() body: { orderId: string; actionType: number }) {
+        return this.escrowService.performAutomationUpkeep(body.orderId, body.actionType);
+    }
+
     @Get('escrow/:orderId')
     async getEscrow(@Param('orderId') orderId: string) {
         return this.escrowService.getEscrow(orderId);
