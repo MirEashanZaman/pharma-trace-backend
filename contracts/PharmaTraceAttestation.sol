@@ -26,10 +26,25 @@ contract PharmaTraceAttestation {
         bool isRevoked;
     }
 
+    struct Accreditation {
+        bytes32 tokenId;
+        address recipient;
+        address issuer;
+        string accreditationType;
+        string jurisdiction;
+        uint256 issuedAt;
+        uint256 validUntil;
+        bool locked;
+        bool revoked;
+        string metadataCid;
+    }
+
     mapping(bytes32 => Attestation) public attestations;
     mapping(string => bytes32[]) public drugHistory;
     mapping(bytes32 => BatchRecord) public batches;
     mapping(bytes32 => mapping(address => bool)) public roles;
+    mapping(bytes32 => Accreditation) public accreditations;
+    mapping(address => bytes32[]) public holderAccreditations;
 
     address public owner;
 
@@ -74,6 +89,24 @@ contract PharmaTraceAttestation {
         bytes32 indexed role,
         address indexed account,
         address indexed sender
+    );
+
+    event Locked(bytes32 indexed tokenId);
+    event Unlocked(bytes32 indexed tokenId);
+    event AccreditationIssued(
+        bytes32 indexed tokenId,
+        address indexed recipient,
+        address indexed issuer,
+        string accreditationType,
+        string jurisdiction,
+        uint256 validUntil,
+        string metadataCid
+    );
+    event AccreditationRevoked(
+        bytes32 indexed tokenId,
+        address indexed revoker,
+        uint256 timestamp,
+        string reason
     );
 
     bool public paused;
@@ -336,4 +369,124 @@ contract PharmaTraceAttestation {
         }
         return (items, total);
     }
+
+    function issueAccreditation(
+        address recipient,
+        string calldata accreditationType,
+        string calldata jurisdiction,
+        uint256 validUntil,
+        string calldata metadataCid
+    ) external whenNotPaused returns (bytes32) {
+        require(
+            msg.sender == owner || roles[REGULATOR_ROLE][msg.sender],
+            "Caller not authorized to issue regulatory accreditation"
+        );
+        require(recipient != address(0), "Invalid recipient address");
+        require(validUntil > block.timestamp, "Expiration must be in the future");
+
+        bytes32 tokenId = keccak256(
+            abi.encodePacked(recipient, accreditationType, block.timestamp, block.prevrandao)
+        );
+        require(accreditations[tokenId].issuedAt == 0, "Token ID collision");
+
+        accreditations[tokenId] = Accreditation({
+            tokenId: tokenId,
+            recipient: recipient,
+            issuer: msg.sender,
+            accreditationType: accreditationType,
+            jurisdiction: jurisdiction,
+            issuedAt: block.timestamp,
+            validUntil: validUntil,
+            locked: true,
+            revoked: false,
+            metadataCid: metadataCid
+        });
+
+        holderAccreditations[recipient].push(tokenId);
+
+        emit AccreditationIssued(
+            tokenId,
+            recipient,
+            msg.sender,
+            accreditationType,
+            jurisdiction,
+            validUntil,
+            metadataCid
+        );
+        emit Locked(tokenId);
+
+        return tokenId;
+    }
+
+    function revokeAccreditation(bytes32 tokenId, string calldata reason) external whenNotPaused {
+        Accreditation storage record = accreditations[tokenId];
+        require(record.issuedAt > 0, "Accreditation not found");
+        require(
+            msg.sender == record.issuer || msg.sender == owner || roles[REGULATOR_ROLE][msg.sender],
+            "Unauthorized to revoke accreditation"
+        );
+        require(!record.revoked, "Already revoked");
+
+        record.revoked = true;
+        emit AccreditationRevoked(tokenId, msg.sender, block.timestamp, reason);
+    }
+
+    function verifyAccreditation(bytes32 tokenId)
+        external
+        view
+        returns (
+            bool exists,
+            bool isValid,
+            address recipient,
+            address issuer,
+            string memory accreditationType,
+            string memory jurisdiction,
+            uint256 validUntil,
+            string memory metadataCid
+        )
+    {
+        Accreditation memory record = accreditations[tokenId];
+        if (record.issuedAt == 0) {
+            return (false, false, address(0), address(0), "", "", 0, "");
+        }
+
+        bool valid = !record.revoked && block.timestamp <= record.validUntil;
+        return (
+            true,
+            valid,
+            record.recipient,
+            record.issuer,
+            record.accreditationType,
+            record.jurisdiction,
+            record.validUntil,
+            record.metadataCid
+        );
+    }
+
+    function locked(bytes32 tokenId) external view returns (bool) {
+        Accreditation memory record = accreditations[tokenId];
+        require(record.issuedAt > 0, "Accreditation not found");
+        return record.locked;
+    }
+
+    function getHolderAccreditations(address holder) external view returns (bytes32[] memory) {
+        return holderAccreditations[holder];
+    }
+
+    function isAccredited(address account, string calldata accreditationType) external view returns (bool) {
+        bytes32[] storage tokens = holderAccreditations[account];
+        bytes32 targetHash = keccak256(bytes(accreditationType));
+        for (uint256 i = 0; i < tokens.length; i++) {
+            Accreditation memory record = accreditations[tokens[i]];
+            if (
+                !record.revoked &&
+                block.timestamp <= record.validUntil &&
+                keccak256(bytes(record.accreditationType)) == targetHash
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
+
