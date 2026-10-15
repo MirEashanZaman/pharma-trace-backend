@@ -11,8 +11,15 @@ import { AuditObserver } from './events/observers/audit.observer';
 import { CustodyTransferSaga } from './events/saga/custody-transfer.saga';
 import { CustodyRollbackEngine } from './events/saga/custody-rollback.engine';
 import { RpcLoadBalancer } from './blockchain/load-balancer/rpc-load-balancer';
+import { MerkleTree } from './blockchain/merkle/merkle-tree';
+import { BatchAttestationEngine } from './blockchain/merkle/batch-attestation.engine';
+import { Eip712CustodyService, CUSTODY_TYPED_DATA_TYPES } from './blockchain/eip712/eip712-custody';
+import { EpcisAggregator } from './blockchain/epcis/epcis-aggregator';
+import { PackagingLevel } from './blockchain/epcis/epcis-hierarchy.types';
+import { HardwareOracleService } from './iot/oracle/hardware-oracle.service';
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
+import { ethers } from 'ethers';
 
 describe('Software Architecture & Design Patterns Specification Suite', () => {
     describe('1. Strategy Pattern & Strategy Factory', () => {
@@ -329,6 +336,256 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             expect(report.restoredCustodyState).toBe(EventType.PACKAGED);
             expect(report.isCompensated).toBe(true);
             expect(report.initiatedBy).toBe('Cold-Chain Regulatory Agent #408');
+        });
+    });
+
+    describe('10. Merkle Tree & Batch Attestation Pattern', () => {
+        const engine = new BatchAttestationEngine();
+        const items = [
+            { serialNumber: 'SN-001', eventType: 'MANUFACTURED', dataHash: '0x1111111111111111111111111111111111111111111111111111111111111111', timestamp: 1000 },
+            { serialNumber: 'SN-002', eventType: 'MANUFACTURED', dataHash: '0x2222222222222222222222222222222222222222222222222222222222222222', timestamp: 1001 },
+            { serialNumber: 'SN-003', eventType: 'MANUFACTURED', dataHash: '0x3333333333333333333333333333333333333333333333333333333333333333', timestamp: 1002 },
+            { serialNumber: 'SN-004', eventType: 'MANUFACTURED', dataHash: '0x4444444444444444444444444444444444444444444444444444444444444444', timestamp: 1003 },
+        ];
+
+        it('should build Merkle tree and verify valid inclusion proof for item', () => {
+            const batch = engine.createBatch(items);
+            expect(batch.merkleRoot).toBeDefined();
+            expect(batch.batchSize).toBe(4);
+            expect(batch.ipfsCid).toMatch(/^ipfs:\/\/bafy/);
+
+            const verification = engine.verifyItemInclusion('SN-002', items[1]);
+            expect(verification.isValid).toBe(true);
+            expect(verification.merkleRoot).toBe(batch.merkleRoot);
+            expect(verification.proof.length).toBeGreaterThan(0);
+        });
+
+        it('should reject forged inclusion proof with altered item data', () => {
+            const batch = engine.createBatch(items);
+            const forgedItem = { ...items[1], dataHash: '0x9999999999999999999999999999999999999999999999999999999999999999' };
+            const forgedLeaf = engine.computeLeaf(forgedItem);
+            const legitimateProof = engine.getProofForItem(batch.batchId, items[1]);
+
+            const isValid = MerkleTree.verifyProof(forgedLeaf, legitimateProof, batch.merkleRoot);
+            expect(isValid).toBe(false);
+        });
+    });
+
+    describe('11. EIP-712 Dual Custody Handshake Pattern', () => {
+        const eip712Service = new Eip712CustodyService();
+        const manufacturerWallet = ethers.Wallet.createRandom();
+        const distributorWallet = ethers.Wallet.createRandom();
+        const contractAddress = '0x1234567890123456789012345678901234567890';
+        const chainId = 31337;
+
+        it('should validate dual handshake when both parties sign structured EIP-712 payloads', async () => {
+            const domain = eip712Service.getDomain(contractAddress, chainId);
+            const offer = {
+                drugSerialNumber: 'SN-EIP712-VAXX-001',
+                fromAddress: manufacturerWallet.address,
+                toAddress: distributorWallet.address,
+                roleFrom: 'MANUFACTURER',
+                roleTo: 'DISTRIBUTOR',
+                nonce: 1,
+                expiry: Date.now() + 60000,
+            };
+
+            const accept = {
+                drugSerialNumber: 'SN-EIP712-VAXX-001',
+                fromAddress: manufacturerWallet.address,
+                toAddress: distributorWallet.address,
+                conditionAccepted: true,
+                nonce: 1,
+                expiry: Date.now() + 60000,
+            };
+
+            const offerSig = await manufacturerWallet.signTypedData(
+                domain,
+                { CustodyTransferOffer: CUSTODY_TYPED_DATA_TYPES.CustodyTransferOffer },
+                offer,
+            );
+
+            const acceptSig = await distributorWallet.signTypedData(
+                domain,
+                { CustodyTransferAccept: CUSTODY_TYPED_DATA_TYPES.CustodyTransferAccept },
+                accept,
+            );
+
+            const result = eip712Service.validateDualCustodyHandshake(
+                offer,
+                offerSig,
+                accept,
+                acceptSig,
+                contractAddress,
+                chainId,
+            );
+
+            expect(result.isValid).toBe(true);
+            expect(result.offerVerified).toBe(true);
+            expect(result.acceptVerified).toBe(true);
+            expect(result.matchedSerial).toBe('SN-EIP712-VAXX-001');
+        });
+
+        it('should reject handshake when destination recipient rejects temperature/condition', async () => {
+            const domain = eip712Service.getDomain(contractAddress, chainId);
+            const offer = {
+                drugSerialNumber: 'SN-EIP712-VAXX-002',
+                fromAddress: manufacturerWallet.address,
+                toAddress: distributorWallet.address,
+                roleFrom: 'MANUFACTURER',
+                roleTo: 'DISTRIBUTOR',
+                nonce: 2,
+                expiry: Date.now() + 60000,
+            };
+
+            const accept = {
+                drugSerialNumber: 'SN-EIP712-VAXX-002',
+                fromAddress: manufacturerWallet.address,
+                toAddress: distributorWallet.address,
+                conditionAccepted: false,
+                nonce: 2,
+                expiry: Date.now() + 60000,
+            };
+
+            const offerSig = await manufacturerWallet.signTypedData(
+                domain,
+                { CustodyTransferOffer: CUSTODY_TYPED_DATA_TYPES.CustodyTransferOffer },
+                offer,
+            );
+
+            const acceptSig = await distributorWallet.signTypedData(
+                domain,
+                { CustodyTransferAccept: CUSTODY_TYPED_DATA_TYPES.CustodyTransferAccept },
+                accept,
+            );
+
+            const result = eip712Service.validateDualCustodyHandshake(
+                offer,
+                offerSig,
+                accept,
+                acceptSig,
+                contractAddress,
+                chainId,
+            );
+
+            expect(result.isValid).toBe(false);
+            expect(result.reason).toContain('Invalid or expired transfer acceptance signature');
+        });
+    });
+
+    describe('12. GS1 EPCIS Packaging Aggregation Hierarchy Pattern', () => {
+        const aggregator = new EpcisAggregator();
+
+        it('should aggregate unit items into case and case into pallet logistics unit', () => {
+            aggregator.registerItem('SGTIN-101', 'GTIN-001', 'LOT-99', 'GLN-WH-01');
+            aggregator.registerItem('SGTIN-102', 'GTIN-001', 'LOT-99', 'GLN-WH-01');
+
+            const caseEvent = aggregator.pack(
+                'SSCC-CASE-501',
+                PackagingLevel.CASE,
+                ['SGTIN-101', 'SGTIN-102'],
+                'GLN-WH-01',
+            );
+            expect(caseEvent.parentSscc).toBe('SSCC-CASE-501');
+
+            const palletEvent = aggregator.pack(
+                'SSCC-PALLET-901',
+                PackagingLevel.PALLET,
+                ['SSCC-CASE-501'],
+                'GLN-WH-01',
+            );
+            expect(palletEvent.parentSscc).toBe('SSCC-PALLET-901');
+
+            const trace = aggregator.traceHierarchy('SGTIN-101');
+            expect(trace.ancestorSsccs).toEqual(['SSCC-CASE-501', 'SSCC-PALLET-901']);
+            expect(trace.rootContainerSscc).toBe('SSCC-PALLET-901');
+            expect(trace.isPackaged).toBe(true);
+        });
+
+        it('should correctly update packaging status when logistics unit is deaggregated', () => {
+            const deaggregated = aggregator.deaggregate('SSCC-CASE-501');
+            expect(deaggregated).toBe(true);
+
+            const trace = aggregator.traceHierarchy('SGTIN-101');
+            expect(trace.isPackaged).toBe(false);
+        });
+    });
+
+    describe('13. Hardware IoT Cryptographic Oracle Pattern', () => {
+        const oracle = new HardwareOracleService();
+        const deviceWallet = ethers.Wallet.createRandom();
+        const deviceId = 'ENCLAVE-SENSOR-ATECC608A-99';
+
+        oracle.registerDevice(
+            deviceId,
+            deviceWallet.address,
+            'ATECC608A-CryptoAuth',
+            'ATECC608A',
+        );
+
+        it('should verify telemetry signed by authorized hardware enclave private key', async () => {
+            const payloadData = {
+                deviceId,
+                temperature: 4.25,
+                humidity: 48.5,
+                timestamp: Date.now(),
+                nonce: 10,
+            };
+
+            const message = oracle.formatTelemetryMessage(payloadData);
+            const signature = await deviceWallet.signMessage(message);
+
+            const report = oracle.verifyTelemetry({
+                ...payloadData,
+                signature,
+            });
+
+            expect(report.isValid).toBe(true);
+            expect(report.deviceAddress).toBe(deviceWallet.address.toLowerCase());
+            expect(report.temperature).toBe(4.25);
+        });
+
+        it('should reject telemetry replaying a previously seen nonce', async () => {
+            const payloadData = {
+                deviceId,
+                temperature: 4.30,
+                humidity: 48.0,
+                timestamp: Date.now(),
+                nonce: 10,
+            };
+
+            const message = oracle.formatTelemetryMessage(payloadData);
+            const signature = await deviceWallet.signMessage(message);
+
+            const report = oracle.verifyTelemetry({
+                ...payloadData,
+                signature,
+            });
+
+            expect(report.isValid).toBe(false);
+            expect(report.reason).toContain('Anti-replay violation');
+        });
+
+        it('should reject forged telemetry with invalid signature', async () => {
+            const maliciousWallet = ethers.Wallet.createRandom();
+            const payloadData = {
+                deviceId,
+                temperature: 35.0,
+                humidity: 90.0,
+                timestamp: Date.now(),
+                nonce: 20,
+            };
+
+            const message = oracle.formatTelemetryMessage(payloadData);
+            const forgedSignature = await maliciousWallet.signMessage(message);
+
+            const report = oracle.verifyTelemetry({
+                ...payloadData,
+                signature: forgedSignature,
+            });
+
+            expect(report.isValid).toBe(false);
+            expect(report.reason).toContain('Signature mismatch');
         });
     });
 });
