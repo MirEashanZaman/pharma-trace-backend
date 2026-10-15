@@ -40,8 +40,11 @@ PharmaTrace-ES implements real-world enterprise design patterns directly within 
 | **Soulbound Accreditation (ERC-5192)** | Identity & Compliance Badges | `src/blockchain/sbt/soulbound-accreditation.service.ts`<br>`contracts/PharmaTraceAttestation.sol` | Non-transferable cryptographic credentials (GMP, GDP, GSP licenses) bound to organization identities with on-chain regulatory verification and revocation. |
 | **Physical-Digital Twin (ERC-1155)** | Anti-Recirculation Defense | `src/blockchain/digital-twin/digital-twin.service.ts`<br>`contracts/PharmaDigitalTwin.sol` | On-chain multi-token representation with burn-on-dispense mechanics permanently destroying serial balance upon patient dispensing to prevent package reuse. |
 | **Conditional Delivery Escrow (DvP)** | Commercial Settlement | `src/blockchain/escrow/pharma-escrow.service.ts`<br>`contracts/PharmaEscrowEngine.sol` | Automated delivery-vs-payment escrow locking invoice funds and releasing payment upon EIP-712 acceptance and verified cold-chain compliance. |
+| **Chainlink Automation & DON Keepers** | Autonomous Settlement | `contracts/PharmaEscrowEngine.sol`<br>`src/blockchain/escrow/pharma-escrow.service.ts` | Decentralized oracle automation (`checkUpkeep` / `performUpkeep`) triggering autonomous settlement payouts and delivery SLA breach refunds without central intermediaries. |
 | **W3C DID & GS1 GLN Resolver** | Identity & Interoperability | `src/blockchain/did/did-resolver.service.ts` | Resolves did:ethr identifiers into standard W3C DID documents with GS1 Global Location Numbers and FDA Establishment Identifiers for DSCSA compliance. |
+| **GS1 Digital Link 1.2 Resolver** | Web Standard Identification | `src/blockchain/digital-link/digital-link.service.ts`<br>`src/blockchain/digital-link/digital-link.controller.ts` | Resolves standard GS1 URIs (`/01/{gtin}/21/{serial}`) to RFC 9264 linksets (e-Leaflets, CoA, EPCIS 2.0, DID accreditation, and on-chain burn checks) with Modulo-10 checksum validation. |
 | **Dynamic NFC (AES-128 CMAC)** | Anti-Cloning Hardware Security | `src/iot/nfc/nfc-verification.service.ts` | Validates NTAG 424 DNA Secure Unique NFC tokens with dynamic CMAC cryptographic digests and strictly monotonic counter progression. |
+| **The Graph Decentralized Indexer** | Query Optimization & Indexing | `subgraph/schema.graphql`<br>`subgraph/subgraph.yaml`<br>`subgraph/src/mapping.ts` | High-performance GraphQL indexing protocol mapping emitted contract events into queryable relational entities. |
 | **Singleton** | Creational | NestJS IoC Dependency Injection | Services (`@Injectable()`) are managed as thread-safe singletons across the entire application runtime. |
 
 All design patterns are verified with automated unit tests in `src/patterns.spec.ts`.
@@ -67,15 +70,22 @@ PharmaTrace-ES enforces enterprise application and Web3 security standards acros
 ```text
 pharma-trace-backend/
 ├── contracts/
-│   └── PharmaTraceAttestation.sol     # Solidity Smart Contract for On-Chain Attestations
+│   ├── PharmaTraceAttestation.sol     # Multi-Role Attestations and Soulbound SBTs
+│   ├── PharmaDigitalTwin.sol          # Physical-Digital Twin with Anti-Recirculation Burn
+│   └── PharmaEscrowEngine.sol         # DvP Escrow Engine with Chainlink Automation
 ├── scripts/
-│   └── compile.js                     # Standalone Solidity Optimizer & Compiler
+│   ├── compile.js                     # Multi-Contract Solidity Optimizer & Compiler
+│   └── deploy.js                      # Deployment Pipeline
+├── subgraph/
+│   ├── schema.graphql                 # Decentralized GraphQL Relational Entities
+│   ├── subgraph.yaml                  # The Graph Multi-Contract Manifest
+│   └── src/mapping.ts                 # AssemblyScript Log Transformation Handlers
 ├── src/
 │   ├── auth/                          # Authentication & Wallet Signature Verification
-│   ├── blockchain/                    # Ethers.js Web3 Provider & Attestation Service
+│   ├── blockchain/                    # Web3 Provider, Digital Twin, Escrow & GS1 Link
 │   ├── drugs/                         # Drug Registration and Batch Management
 │   ├── events/                        # Event Sourcing, CQRS & Custody Saga Engine
-│   ├── iot/                           # Temperature/Humidity Telemetry Checkpoints
+│   ├── iot/                           # Telemetry Checkpoints & Dynamic NFC Verification
 │   ├── ledger/                        # Hash-Chain Verification Layer
 │   ├── app.module.ts
 │   └── main.ts
