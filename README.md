@@ -47,6 +47,7 @@ PharmaTrace-ES implements real-world enterprise design patterns directly within 
 | **Dynamic NFC (AES-128 CMAC)** | Anti-Cloning Hardware Security | `src/iot/nfc/nfc-verification.service.ts` | Validates NTAG 424 DNA Secure Unique NFC tokens with dynamic CMAC cryptographic digests and strictly monotonic counter progression. |
 | **The Graph Decentralized Indexer** | Query Optimization & Indexing | `subgraph/schema.graphql`<br>`subgraph/subgraph.yaml`<br>`subgraph/src/mapping.ts` | High-performance GraphQL indexing protocol mapping emitted contract events into queryable relational entities. |
 | **Regulatory Multi-Sig & Timelock** | Decentralized Governance / Security | `contracts/PharmaGovernanceTimelock.sol`<br>`src/blockchain/governance/governance-timelock.service.ts` | M-of-N threshold quorum across regulatory authorities (FDA, EMA, MHRA) with mandatory 48-hour timelock delay before executing sensitive parameter changes, license revocations, or circuit pauses. |
+| **Hardware Security Module (HSM) Cloud KMS Signer** | Key Management / Operational Security | `src/blockchain/kms/kms-signer.service.ts`<br>`src/blockchain/kms/kms.controller.ts` | Enterprise key management delegating transaction and attestation signing to FIPS 140-2 Level 3 hardware security modules (AWS KMS, Google Cloud KMS, Azure Key Vault, HashiCorp Vault), eliminating plaintext private keys from backend runtime with ASN.1 DER decoding, EIP-2 low-s normalization, and public key v recovery. |
 | **Singleton** | Creational | NestJS IoC Dependency Injection | Services (`@Injectable()`) are managed as thread-safe singletons across the entire application runtime. |
 
 All design patterns are verified with automated unit tests in `src/patterns.spec.ts`.
@@ -58,6 +59,7 @@ All design patterns are verified with automated unit tests in `src/patterns.spec
 PharmaTrace-ES enforces enterprise application and Web3 security standards across the system perimeter:
 
 * **EIP-4361 SIWE Challenge-Nonce Authentication**: Server-issued, time-bounded challenge nonces prevent wallet signature replay attacks on Web3 login routes (`/auth/challenge/:walletAddress`).
+* **Hardware Security Module (HSM) Cloud KMS Signer**: Private keys never touch application memory or environment variables; signing operations use FIPS 140-2 Level 3 cloud enclaves with canonical low-s normalization and deterministic address recovery.
 * **Privilege Escalation Immunity**: Strict server-side role enforcement prevents clients from claiming administrative privileges during self-registration.
 * **API Rate Limiting & DDoS Mitigation**: Global NestJS `ThrottlerGuard` enforces request quotas across authentication, IoT ingest, and mutation routes.
 * **HTTP Security Headers & Restricted CORS**: Helmet middleware enforces secure headers (HSTS, CSP, X-Frame-Options), while CORS strictly whitelists verified client origins.
@@ -85,7 +87,7 @@ pharma-trace-backend/
 │   └── src/mapping.ts                 # AssemblyScript Log Transformation Handlers
 ├── src/
 │   ├── auth/                          # Authentication & Wallet Signature Verification
-│   ├── blockchain/                    # Web3 Provider, Digital Twin, Escrow & GS1 Link
+│   ├── blockchain/                    # Web3 Provider, Digital Twin, Escrow, KMS Signer & GS1 Link
 │   ├── drugs/                         # Drug Registration and Batch Management
 │   ├── events/                        # Event Sourcing, CQRS & Custody Saga Engine
 │   ├── iot/                           # Telemetry Checkpoints & Dynamic NFC Verification
