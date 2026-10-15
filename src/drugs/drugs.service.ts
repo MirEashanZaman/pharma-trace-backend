@@ -111,27 +111,38 @@ export class DrugsService implements OnModuleInit {
             .build();
     }
 
+    private escapeCsvField(val: unknown): string {
+        if (val === null || val === undefined) {
+            return '""';
+        }
+        const str = String(val).replace(/"/g, '""');
+        if (/^[=+\-@\t\r]/.test(str)) {
+            return `"'${str}"`;
+        }
+        return `"${str}"`;
+    }
+
     async exportAuditCsv(serialNumber: string) {
         const dossier = await this.getAuditDossier(serialNumber);
         const lines: string[] = [];
 
         lines.push('PHARMATRACE-ES REGULATORY AUDIT & GXP COMPLIANCE DOSSIER');
         lines.push(`GeneratedAt,${new Date().toISOString()}`);
-        lines.push(`DrugSerialNumber,${dossier.serialNumber}`);
-        lines.push(`DrugName,"${dossier.drugName}"`);
-        lines.push(`BatchNumber,${dossier.batchNumber}`);
-        lines.push(`Manufacturer,"${dossier.manufacturer}"`);
-        lines.push(`RegulatoryDisposition,${dossier.complianceSummary.disposition}`);
+        lines.push(`DrugSerialNumber,${this.escapeCsvField(dossier.serialNumber)}`);
+        lines.push(`DrugName,${this.escapeCsvField(dossier.drugName)}`);
+        lines.push(`BatchNumber,${this.escapeCsvField(dossier.batchNumber)}`);
+        lines.push(`Manufacturer,${this.escapeCsvField(dossier.manufacturer)}`);
+        lines.push(`RegulatoryDisposition,${this.escapeCsvField(dossier.complianceSummary.disposition)}`);
         lines.push(`GxPCompliancePercentage,${dossier.complianceSummary.compliancePercentage}%`);
         lines.push(`TotalLifecycleEvents,${dossier.complianceSummary.totalEvents}`);
         lines.push(`TotalTelemetryReadings,${dossier.complianceSummary.totalTelemetryPings}`);
-        lines.push(`TemperatureRange,${dossier.complianceSummary.minTemperature}°C to ${dossier.complianceSummary.maxTemperature}°C (Average: ${dossier.complianceSummary.averageTemperature}°C)`);
+        lines.push(`TemperatureRange,${this.escapeCsvField(`${dossier.complianceSummary.minTemperature}°C to ${dossier.complianceSummary.maxTemperature}°C (Average: ${dossier.complianceSummary.averageTemperature}°C)`)}`);
         lines.push('');
         lines.push('Step,EventType,Timestamp,Handler,Role,Temperature,Humidity,Location,SignerAddress,EventHash');
 
         dossier.custodyTimeline.forEach((item) => {
             lines.push(
-                `${item.step},${item.eventType},${item.timestamp},"${item.handler}",${item.role},${item.temperature ?? 'N/A'},${item.humidity ?? 'N/A'},"${item.location}",${item.signerAddress},${item.eventHash}`,
+                `${item.step},${item.eventType},${item.timestamp},${this.escapeCsvField(item.handler)},${item.role},${item.temperature ?? 'N/A'},${item.humidity ?? 'N/A'},${this.escapeCsvField(item.location)},${item.signerAddress},${item.eventHash}`,
             );
         });
 
