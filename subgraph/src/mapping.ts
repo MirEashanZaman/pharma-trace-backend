@@ -25,13 +25,39 @@ import {
   Accreditation
 } from "../generated/schema";
 
+function sanitizeString(value: string, maxLen: number): string {
+  let len = value.length;
+  if (len > maxLen) {
+    len = maxLen;
+  }
+  let out = "";
+  for (let i = 0; i < len; i++) {
+    let c = value.charCodeAt(i);
+    if (c == 0 || (c < 32 && c != 9 && c != 10 && c != 13)) {
+      continue;
+    }
+    if (c == 60) {
+      out = out.concat("&lt;");
+    } else if (c == 62) {
+      out = out.concat("&gt;");
+    } else if (c == 34) {
+      out = out.concat("&quot;");
+    } else if (c == 39) {
+      out = out.concat("&#x27;");
+    } else {
+      out = out.concat(value.charAt(i));
+    }
+  }
+  return out;
+}
+
 export function handleItemMinted(event: ItemMinted): void {
   let id = event.params.tokenId.toHexString();
   let twin = new DigitalTwin(id);
   twin.tokenId = event.params.tokenId;
-  twin.serialNumber = event.params.serialNumber;
-  twin.gtin = event.params.gtin;
-  twin.batchNumber = event.params.batchNumber;
+  twin.serialNumber = sanitizeString(event.params.serialNumber, 128);
+  twin.gtin = sanitizeString(event.params.gtin, 64);
+  twin.batchNumber = sanitizeString(event.params.batchNumber, 64);
   twin.currentHolder = event.params.manufacturer;
   twin.status = "MINTED";
   twin.isBurned = false;
@@ -80,7 +106,7 @@ export function handleEscrowFunded(event: EscrowFunded): void {
   escrow.buyer = event.params.buyer;
   escrow.seller = event.params.seller;
   escrow.amountWei = event.params.amountWei;
-  escrow.drugSerialNumber = event.params.drugSerialNumber;
+  escrow.drugSerialNumber = sanitizeString(event.params.drugSerialNumber, 128);
   escrow.status = "FUNDED";
   escrow.coldChainCompliant = false;
   escrow.custodyAccepted = false;
@@ -114,7 +140,7 @@ export function handleEscrowRefunded(event: EscrowRefunded): void {
   let escrow = EscrowOrder.load(orderId);
   if (escrow) {
     escrow.status = "REFUNDED";
-    escrow.refundReason = event.params.reason;
+    escrow.refundReason = sanitizeString(event.params.reason, 256);
     escrow.settledAt = event.block.timestamp;
     escrow.save();
   }
@@ -124,12 +150,12 @@ export function handleAttestationRegistered(event: AttestationRegistered): void 
   let id = event.params.dataHash.toHexString();
   let attestation = new Attestation(id);
   attestation.dataHash = event.params.dataHash;
-  attestation.drugSerialNumber = event.params.drugSerialNumber;
-  attestation.eventType = event.params.eventType;
+  attestation.drugSerialNumber = sanitizeString(event.params.drugSerialNumber, 128);
+  attestation.eventType = sanitizeString(event.params.eventType, 64);
   attestation.signer = event.params.signer;
   attestation.timestamp = event.params.timestamp;
   attestation.isRevoked = false;
-  attestation.metadataUri = event.params.metadataUri;
+  attestation.metadataUri = sanitizeString(event.params.metadataUri, 512);
   attestation.blockNumber = event.block.number;
   attestation.transactionHash = event.transaction.hash;
   attestation.save();
@@ -140,7 +166,7 @@ export function handleAttestationRevoked(event: AttestationRevoked): void {
   let attestation = Attestation.load(id);
   if (attestation) {
     attestation.isRevoked = true;
-    attestation.revocationReason = event.params.reason;
+    attestation.revocationReason = sanitizeString(event.params.reason, 256);
     attestation.save();
   }
 }
@@ -150,7 +176,7 @@ export function handleBatchAnchored(event: BatchAnchored): void {
   let batch = new BatchAnchor(id);
   batch.merkleRoot = event.params.merkleRoot;
   batch.batchSize = event.params.batchSize;
-  batch.ipfsCid = event.params.ipfsCid;
+  batch.ipfsCid = sanitizeString(event.params.ipfsCid, 128);
   batch.submitter = event.params.submitter;
   batch.timestamp = event.params.timestamp;
   batch.isRevoked = false;
@@ -165,10 +191,10 @@ export function handleAccreditationIssued(event: AccreditationIssued): void {
   acc.tokenId = event.params.tokenId;
   acc.recipient = event.params.recipient;
   acc.issuer = event.params.issuer;
-  acc.accreditationType = event.params.accreditationType;
-  acc.jurisdiction = event.params.jurisdiction;
+  acc.accreditationType = sanitizeString(event.params.accreditationType, 64);
+  acc.jurisdiction = sanitizeString(event.params.jurisdiction, 64);
   acc.validUntil = event.params.validUntil;
-  acc.metadataCid = event.params.metadataCid;
+  acc.metadataCid = sanitizeString(event.params.metadataCid, 128);
   acc.isRevoked = false;
   acc.issuedAt = event.block.timestamp;
   acc.blockNumber = event.block.number;
