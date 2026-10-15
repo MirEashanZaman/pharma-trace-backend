@@ -2,6 +2,8 @@ import { Injectable, BadRequestException, NotFoundException, Logger } from '@nes
 import {
   SigningKey,
   Wallet,
+  HDNodeWallet,
+  BaseWallet,
   keccak256,
   toUtf8Bytes,
   computeAddress,
@@ -70,7 +72,7 @@ export class VerifiableCredentialService {
 
   async issueBatchReleaseCredential(
     subject: Omit<BatchReleaseSubject, 'id'>,
-    issuerWalletOrKey: Wallet | SigningKey,
+    issuerWalletOrKey: Wallet | HDNodeWallet | BaseWallet | SigningKey | any,
   ): Promise<VerifiableCredential<BatchReleaseSubject>> {
     const issuerAddress = this.getIssuerAddress(issuerWalletOrKey);
 
@@ -139,7 +141,7 @@ export class VerifiableCredentialService {
   async issueCarrierAccreditationCredential(
     subject: Omit<CarrierAccreditationSubject, 'id'>,
     carrierDidAddress: string,
-    issuerWalletOrKey: Wallet | SigningKey,
+    issuerWalletOrKey: Wallet | HDNodeWallet | BaseWallet | SigningKey | any,
   ): Promise<VerifiableCredential<CarrierAccreditationSubject>> {
     const issuerAddress = this.getIssuerAddress(issuerWalletOrKey);
 
@@ -255,7 +257,7 @@ export class VerifiableCredentialService {
 
   async createVerifiablePresentation(
     credentials: VerifiableCredential[],
-    holderWallet: Wallet | any,
+    holderWallet: Wallet | HDNodeWallet | BaseWallet | any,
     challenge: string,
     domain: string = 'pharmatrace.org',
   ): Promise<VerifiablePresentation> {
