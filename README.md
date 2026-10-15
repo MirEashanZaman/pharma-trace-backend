@@ -40,6 +40,20 @@ All design patterns are verified with automated unit tests in `src/patterns.spec
 
 ---
 
+## Cybersecurity & Defense-in-Depth Controls
+
+PharmaTrace-ES enforces enterprise application and Web3 security standards across the system perimeter:
+
+* **EIP-4361 SIWE Challenge-Nonce Authentication**: Server-issued, time-bounded challenge nonces prevent wallet signature replay attacks on Web3 login routes (`/auth/challenge/:walletAddress`).
+* **Privilege Escalation Immunity**: Strict server-side role enforcement prevents clients from claiming administrative privileges during self-registration.
+* **API Rate Limiting & DDoS Mitigation**: Global NestJS `ThrottlerGuard` enforces request quotas across authentication, IoT ingest, and mutation routes.
+* **HTTP Security Headers & Restricted CORS**: Helmet middleware enforces secure headers (HSTS, CSP, X-Frame-Options), while CORS strictly whitelists verified client origins.
+* **Hardware Enclave Telemetry Authentication**: Ingest routes enforce on-chip ECDSA signature verification (`HardwareOracleService`), halting spoofed sensor readings and anti-replay violations.
+* **GxP Append-Only Audit Trail**: Destructive deletion routes are eliminated; lifecycle records are strictly append-only in compliance with US FDA 21 CFR Part 11 and EU GxP Annex 11.
+* **On-Chain Role-Based Access Control**: Smart contract mutation functions (`registerAttestation`, `anchorBatch`) restrict execution strictly to verified enterprise roles.
+
+---
+
 ##  Folder Structure
 
 ```text
