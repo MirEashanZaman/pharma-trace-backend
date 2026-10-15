@@ -23,6 +23,7 @@ import { PaymasterService } from './blockchain/account-abstraction/paymaster.ser
 import { SoulboundAccreditationService, AccreditationType } from './blockchain/sbt/soulbound-accreditation.service';
 import { DigitalTwinService, DigitalTwinStatus } from './blockchain/digital-twin/digital-twin.service';
 import { PharmaEscrowService, EscrowState } from './blockchain/escrow/pharma-escrow.service';
+import { CarrierStakingService } from './blockchain/escrow/carrier-staking.service';
 import { DidResolverService } from './blockchain/did/did-resolver.service';
 import { NfcVerificationService } from './iot/nfc/nfc-verification.service';
 import { DigitalLinkService } from './blockchain/digital-link/digital-link.service';
@@ -1825,7 +1826,149 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             expect(version.cbvVersion).toBe('2.0');
         });
     });
+
+    describe('28. Carrier Collateral Staking & Automated Slashing Smart Escrow Pattern', () => {
+        const consensusEngine = new SensorConsensusEngine();
+        const stakingService = new CarrierStakingService(consensusEngine);
+
+        const carrierWallet = ethers.Wallet.createRandom();
+        const manufacturerWallet = ethers.Wallet.createRandom();
+        const testSerial = 'SN-2026-STAKE-VAX-01';
+
+        it('should stake ERC-20 collateral tokens and accredit cold-chain carrier', () => {
+            const account = stakingService.depositStake({
+                carrierAddress: carrierWallet.address,
+                amountTokens: 50000,
+                tokenSymbol: 'USDC',
+            });
+
+            expect(account.carrierAddress.toLowerCase()).toBe(carrierWallet.address.toLowerCase());
+            expect(account.totalStaked).toBe(50000);
+            expect(account.availableCollateral).toBe(50000);
+            expect(account.lockedCollateral).toBe(0);
+            expect(account.isAccredited).toBe(true);
+        });
+
+        it('should lock collateral bond for active cold-chain pharmaceutical shipment', () => {
+            const bond = stakingService.lockShipmentBond({
+                shipmentId: 'SHIPMENT-BOND-2026-01',
+                carrierAddress: carrierWallet.address,
+                manufacturerAddress: manufacturerWallet.address,
+                drugSerialNumber: testSerial,
+                bondAmount: 10000,
+                minTemp: 2.0,
+                maxTemp: 8.0,
+            });
+
+            expect(bond.shipmentId).toBe('SHIPMENT-BOND-2026-01');
+            expect(bond.status).toBe('LOCKED');
+            expect(bond.bondAmount).toBe(10000);
+
+            const account = stakingService.getAccount(carrierWallet.address);
+            expect(account.lockedCollateral).toBe(10000);
+            expect(account.availableCollateral).toBe(40000);
+        });
+
+        it('should reject locking bond exceeding carrier available collateral', () => {
+            expect(() =>
+                stakingService.lockShipmentBond({
+                    shipmentId: 'SHIPMENT-BOND-EXCESS',
+                    carrierAddress: carrierWallet.address,
+                    manufacturerAddress: manufacturerWallet.address,
+                    drugSerialNumber: testSerial,
+                    bondAmount: 45000,
+                }),
+            ).toThrow('Insufficient available collateral');
+        });
+
+        it('should release carrier collateral bond upon multi-sensor consensus compliance', () => {
+            const compliantCluster: CheckpointCluster = {
+                checkpointId: 'CHK-REEFER-BERLIN-01',
+                timestamp: Date.now(),
+                readings: [
+                    { sensorId: 'PROBE-A1', temperature: 4.1 },
+                    { sensorId: 'PROBE-A2', temperature: 4.3 },
+                    { sensorId: 'PROBE-A3', temperature: 4.2 },
+                    { sensorId: 'PROBE-OUTLIER', temperature: 16.5 },
+                ],
+            };
+
+            const resolution = stakingService.evaluateAndResolveBond(
+                'SHIPMENT-BOND-2026-01',
+                [compliantCluster],
+            );
+
+            expect(resolution.status).toBe('RELEASED');
+            expect(resolution.slashedAmount).toBe(0);
+            expect(resolution.isolatedFaultsCount).toBe(1);
+            expect(resolution.clusterMedianTemp).toBe(4.25);
+            expect(resolution.consensusReportHash).toBeDefined();
+
+            const account = stakingService.getAccount(carrierWallet.address);
+            expect(account.lockedCollateral).toBe(0);
+            expect(account.availableCollateral).toBe(50000);
+        });
+
+        it('should autonomously slash carrier bond and indemnify manufacturer upon consensus temperature excursion', () => {
+            const spoiledShipmentId = 'SHIPMENT-SPOILED-EXCURSION-02';
+            stakingService.lockShipmentBond({
+                shipmentId: spoiledShipmentId,
+                carrierAddress: carrierWallet.address,
+                manufacturerAddress: manufacturerWallet.address,
+                drugSerialNumber: 'SN-SPOILED-BATCH-88',
+                bondAmount: 15000,
+            });
+
+            const excursionCluster: CheckpointCluster = {
+                checkpointId: 'CHK-EXCURSION-PARIS-02',
+                timestamp: Date.now(),
+                readings: [
+                    { sensorId: 'PROBE-B1', temperature: 14.2 },
+                    { sensorId: 'PROBE-B2', temperature: 14.8 },
+                    { sensorId: 'PROBE-B3', temperature: 14.5 },
+                ],
+            };
+
+            const resolution = stakingService.evaluateAndResolveBond(
+                spoiledShipmentId,
+                [excursionCluster],
+                100,
+            );
+
+            expect(resolution.status).toBe('SLASHED');
+            expect(resolution.slashedAmount).toBe(15000);
+            expect(resolution.indemnityRecipient?.toLowerCase()).toBe(manufacturerWallet.address.toLowerCase());
+            expect(resolution.reason).toContain('Autonomous bond slashing');
+
+            const account = stakingService.getAccount(carrierWallet.address);
+            expect(account.totalSlashed).toBe(15000);
+            expect(account.totalStaked).toBe(35000);
+            expect(account.lockedCollateral).toBe(0);
+            expect(account.availableCollateral).toBe(35000);
+
+            const indemnityReceived = stakingService.getManufacturerIndemnity(manufacturerWallet.address);
+            expect(indemnityReceived).toBe(15000);
+        });
+
+        it('should allow withdrawing unlocked collateral while protecting active locked bonds', () => {
+            const updatedAccount = stakingService.unstake({
+                carrierAddress: carrierWallet.address,
+                amountTokens: 10000,
+            });
+
+            expect(updatedAccount.totalStaked).toBe(25000);
+            expect(updatedAccount.availableCollateral).toBe(25000);
+
+            expect(() =>
+                stakingService.unstake({
+                    carrierAddress: carrierWallet.address,
+                    amountTokens: 30000,
+                }),
+            ).toThrow('Cannot unstake');
+        });
+    });
 });
+
 
 
 
