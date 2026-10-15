@@ -11,8 +11,10 @@ import { Injectable, Logger } from '@nestjs/common';
 
 @WebSocketGateway({
     cors: {
-        origin: '*',
-        methods: ['GET', 'POST'],
+        origin: process.env.CORS_ALLOWED_ORIGINS
+            ? process.env.CORS_ALLOWED_ORIGINS.split(',')
+            : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+        credentials: true,
     },
 })
 @Injectable()
@@ -29,6 +31,12 @@ export class IotGateway
     }
 
     handleConnection(client: Socket) {
+        const token = client.handshake.auth?.token || client.handshake.headers?.authorization;
+        if (!token && process.env.NODE_ENV === 'production') {
+            this.logger.warn(`Rejecting unauthenticated socket connection: ${client.id}`);
+            client.disconnect();
+            return;
+        }
         this.logger.log(`Client Connected: ${client.id}`);
     }
 
