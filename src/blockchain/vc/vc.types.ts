@@ -1,6 +1,5 @@
 export interface CredentialSubject {
   id: string;
-  [key: string]: any;
 }
 
 export interface BatchReleaseSubject extends CredentialSubject {
