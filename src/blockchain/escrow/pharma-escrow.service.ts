@@ -142,4 +142,58 @@ export class PharmaEscrowService {
     }
     return record;
   }
+
+  async checkAutomationUpkeep(): Promise<{ upkeepNeeded: boolean; orderId?: string; actionType?: number; reason?: string }> {
+    const nowSec = Math.floor(Date.now() / 1000);
+    for (const [orderId, order] of this.escrows.entries()) {
+      if (order.status === EscrowState.FUNDED) {
+        if (order.coldChainCompliant && order.custodyAccepted) {
+          return {
+            upkeepNeeded: true,
+            orderId,
+            actionType: 1,
+            reason: 'Conditions met for automated release to seller',
+          };
+        }
+        if (nowSec > order.timeoutTimestamp) {
+          return {
+            upkeepNeeded: true,
+            orderId,
+            actionType: 2,
+            reason: 'Timeout SLA exceeded for automated refund to buyer',
+          };
+        }
+      }
+    }
+    return { upkeepNeeded: false };
+  }
+
+  async performAutomationUpkeep(orderId: string, actionType: number): Promise<EscrowRecord> {
+    const order = await this.getEscrow(orderId);
+    if (order.status !== EscrowState.FUNDED) {
+      throw new BadRequestException(`Order ${orderId} is not in funded status`);
+    }
+
+    if (actionType === 1) {
+      if (!order.coldChainCompliant || !order.custodyAccepted) {
+        throw new BadRequestException('Compliance conditions not met for automated release');
+      }
+      order.status = EscrowState.RELEASED;
+      order.settlementTxHash = keccak256(toUtf8Bytes(`KEEPER_SETTLE:${orderId}:${Date.now()}`));
+      this.escrows.set(orderId, order);
+      this.logger.log(`Chainlink Automation Keeper performed release for escrow ${orderId}`);
+      return order;
+    }
+
+    if (actionType === 2) {
+      order.status = EscrowState.REFUNDED;
+      order.refundReason = 'Chainlink Automation Keeper: Delivery SLA timeout refund';
+      this.escrows.set(orderId, order);
+      this.logger.log(`Chainlink Automation Keeper performed timeout refund for escrow ${orderId}`);
+      return order;
+    }
+
+    throw new BadRequestException(`Unsupported upkeep action type: ${actionType}`);
+  }
 }
+
