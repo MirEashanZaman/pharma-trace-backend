@@ -1,0 +1,83 @@
+type DigitalTwin @entity {
+  id: ID!
+  tokenId: BigInt!
+  serialNumber: String!
+  gtin: String!
+  batchNumber: String!
+  currentHolder: Bytes!
+  status: String!
+  isBurned: Boolean!
+  dispenser: Bytes
+  mintedAt: BigInt!
+  burnedAt: BigInt
+  ipfsDossierCid: String
+  transfers: [CustodyTransfer!]! @derivedFrom(field: "twin")
+}
+
+type CustodyTransfer @entity {
+  id: ID!
+  twin: DigitalTwin!
+  from: Bytes!
+  to: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type EscrowOrder @entity {
+  id: ID!
+  orderId: Bytes!
+  buyer: Bytes!
+  seller: Bytes!
+  amountWei: BigInt!
+  drugSerialNumber: String!
+  status: String!
+  coldChainCompliant: Boolean!
+  custodyAccepted: Boolean!
+  createdAt: BigInt!
+  settledAt: BigInt
+  refundReason: String
+  transactionHash: Bytes!
+}
+
+type Attestation @entity {
+  id: ID!
+  dataHash: Bytes!
+  drugSerialNumber: String!
+  eventType: String!
+  signer: Bytes!
+  timestamp: BigInt!
+  isRevoked: Boolean!
+  revocationReason: String
+  metadataUri: String!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type BatchAnchor @entity {
+  id: ID!
+  merkleRoot: Bytes!
+  batchSize: Int!
+  ipfsCid: String!
+  submitter: Bytes!
+  timestamp: BigInt!
+  isRevoked: Boolean!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type Accreditation @entity {
+  id: ID!
+  tokenId: Bytes!
+  recipient: Bytes!
+  issuer: Bytes!
+  accreditationType: String!
+  jurisdiction: String!
+  validUntil: BigInt!
+  metadataCid: String!
+  isRevoked: Boolean!
+  issuedAt: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
