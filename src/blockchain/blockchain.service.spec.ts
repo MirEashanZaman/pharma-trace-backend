@@ -8,6 +8,7 @@ import { SoulboundAccreditationService } from './sbt/soulbound-accreditation.ser
 import { DigitalTwinService } from './digital-twin/digital-twin.service';
 import { PharmaEscrowService } from './escrow/pharma-escrow.service';
 import { DidResolverService } from './did/did-resolver.service';
+import { EpcisJsonLdService } from './epcis/epcis-jsonld.service';
 
 describe('BlockchainModule Integration', () => {
     let service: BlockchainService;
@@ -25,6 +26,7 @@ describe('BlockchainModule Integration', () => {
                 DigitalTwinService,
                 PharmaEscrowService,
                 DidResolverService,
+                EpcisJsonLdService,
             ],
         }).compile();
 
