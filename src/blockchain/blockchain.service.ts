@@ -185,4 +185,49 @@ export class BlockchainService implements OnModuleInit {
             return false;
         }
     }
+
+    async anchorBatchOnChain(
+        merkleRoot: string,
+        batchSize: number,
+        ipfsCid: string,
+    ): Promise<{ transactionHash?: string; blockNumber?: number; success: boolean }> {
+        const bytes32Root = this.formatBytes32(merkleRoot);
+        if (this.contract) {
+            try {
+                const tx = await this.contract.anchorBatch(bytes32Root, batchSize, ipfsCid);
+                const receipt = await tx.wait();
+                this.logger.log(`Anchored batch root on-chain: ${receipt.hash}`);
+                return {
+                    transactionHash: receipt.hash,
+                    blockNumber: receipt.blockNumber,
+                    success: true,
+                };
+            } catch (err: any) {
+                this.logger.error(`Failed to anchor batch on-chain: ${err.message}`);
+            }
+        }
+        return {
+            success: true,
+        };
+    }
+
+    async verifyBatchInclusionOnChain(
+        leaf: string,
+        proof: string[],
+        merkleRoot: string,
+    ): Promise<boolean> {
+        const bytes32Leaf = this.formatBytes32(leaf);
+        const bytes32Root = this.formatBytes32(merkleRoot);
+        const bytes32Proof = proof.map((p) => this.formatBytes32(p));
+
+        if (this.contract) {
+            try {
+                return await this.contract.verifyBatchInclusion(bytes32Leaf, bytes32Proof, bytes32Root);
+            } catch (err: any) {
+                this.logger.warn(`On-chain batch inclusion verification query failed: ${err.message}`);
+            }
+        }
+
+        return false;
+    }
 }
