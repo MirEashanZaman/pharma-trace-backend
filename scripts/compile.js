@@ -2,16 +2,21 @@ const fs = require('fs');
 const path = require('path');
 const solc = require('solc');
 
-const contractPath = path.resolve(__dirname, '..', 'contracts', 'PharmaTraceAttestation.sol');
-const source = fs.readFileSync(contractPath, 'utf8');
+const contractsDir = path.resolve(__dirname, '..', 'contracts');
+const artifactsDir = path.resolve(__dirname, '..', 'src', 'blockchain', 'artifacts');
+fs.mkdirSync(artifactsDir, { recursive: true });
+
+const files = fs.readdirSync(contractsDir).filter(f => f.endsWith('.sol'));
+const sources = {};
+for (const file of files) {
+  sources[file] = {
+    content: fs.readFileSync(path.join(contractsDir, file), 'utf8'),
+  };
+}
 
 const input = {
   language: 'Solidity',
-  sources: {
-    'PharmaTraceAttestation.sol': {
-      content: source,
-    },
-  },
+  sources,
   settings: {
     optimizer: {
       enabled: true,
@@ -36,20 +41,21 @@ if (output.errors) {
   }
 }
 
-const contract = output.contracts['PharmaTraceAttestation.sol']['PharmaTraceAttestation'];
+for (const file of files) {
+  const contractsInFile = output.contracts[file];
+  if (!contractsInFile) continue;
+  for (const contractName of Object.keys(contractsInFile)) {
+    const contract = contractsInFile[contractName];
+    const artifact = {
+      contractName,
+      abi: contract.abi,
+      bytecode: contract.evm.bytecode.object,
+    };
+    fs.writeFileSync(
+      path.join(artifactsDir, `${contractName}.json`),
+      JSON.stringify(artifact, null, 2)
+    );
+    console.log(`Compiled -> ${contractName}.json`);
+  }
+}
 
-const artifactsDir = path.resolve(__dirname, '..', 'src', 'blockchain', 'artifacts');
-fs.mkdirSync(artifactsDir, { recursive: true });
-
-const artifact = {
-  contractName: 'PharmaTraceAttestation',
-  abi: contract.abi,
-  bytecode: contract.evm.bytecode.object,
-};
-
-fs.writeFileSync(
-  path.join(artifactsDir, 'PharmaTraceAttestation.json'),
-  JSON.stringify(artifact, null, 2)
-);
-
-console.log(' Contract compiled successfully -> src/blockchain/artifacts/PharmaTraceAttestation.json');
