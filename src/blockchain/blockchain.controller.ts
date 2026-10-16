@@ -2,8 +2,11 @@ import {
     Body,
     Controller,
     Get,
+    Put,
+    Delete,
     Param,
     Post,
+    Query,
     UseGuards,
     ForbiddenException,
 } from '@nestjs/common';
@@ -86,6 +89,18 @@ export class BlockchainController {
         );
     }
 
+    @Get('attestations')
+    async queryAttestations(
+        @Query('serialNumber') serialNumber?: string,
+        @Query('limit') limit?: string,
+    ) {
+        if (serialNumber) {
+            const records = await this.blockchainService.getDrugAttestations(serialNumber);
+            return limit ? records.slice(0, Number(limit)) : records;
+        }
+        return [];
+    }
+
     @Get('verify/:hash')
     async verifyAttestation(@Param('hash') hash: string) {
         return this.blockchainService.verifyAttestation(hash);
@@ -123,9 +138,31 @@ export class BlockchainController {
         return this.ipfsService.pinJson(body.payload, body.name);
     }
 
+    @Get('ipfs')
+    async listDossiers(@Query('limit') limit?: string) {
+        const all = this.ipfsService.getAllPinnedDossiers();
+        return limit ? all.slice(0, Number(limit)) : all;
+    }
+
     @Get('ipfs/:cid')
     async getDossier(@Param('cid') cid: string) {
         return this.ipfsService.retrieveJson(cid);
+    }
+
+    @Put('ipfs/:cid')
+    async updateDossier(
+        @Param('cid') cid: string,
+        @Body() body: { name: string },
+    ) {
+        return this.ipfsService.updateDossierMetadata(cid, body.name);
+    }
+
+    @Delete('ipfs/:cid')
+    async deleteDossier(@Param('cid') cid: string) {
+        return {
+            unpinned: this.ipfsService.unpinJson(cid),
+            cid,
+        };
     }
 
     @Post('zk/cold-chain-proof')
