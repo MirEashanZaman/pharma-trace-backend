@@ -175,16 +175,47 @@ export class DrugEventsService {
         );
     }
 
-    findAll() {
+    findAll(query?: {
+        eventType?: EventType;
+        limit?: number;
+        offset?: number;
+    }) {
+        const where: any = {};
+        if (query?.eventType) {
+            where.eventType = query.eventType;
+        }
         return this.drugEventRepository.find({
+            where: Object.keys(where).length > 0 ? where : undefined,
             relations: {
                 drug: true,
             },
-
             order: {
                 createdAt: 'ASC',
             },
+            take: query?.limit ? Number(query.limit) : undefined,
+            skip: query?.offset ? Number(query.offset) : undefined,
         });
+    }
+
+    async findById(id: number) {
+        const event = await this.drugEventRepository.findOne({
+            where: { id },
+            relations: { drug: true },
+        });
+        if (!event) {
+            throw new NotFoundException(`Drug event with id ${id} not found`);
+        }
+        return event;
+    }
+
+    async updateEventNotes(id: number, notes: string) {
+        const event = await this.findById(id);
+        if (event.eventData && typeof event.eventData === 'object') {
+            (event.eventData as any).notes = notes;
+        } else {
+            event.eventData = { notes };
+        }
+        return this.drugEventRepository.save(event);
     }
 
     findBySerialNumber(
