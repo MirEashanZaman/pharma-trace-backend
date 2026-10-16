@@ -2,8 +2,11 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
   Param,
+  Query,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -47,6 +50,19 @@ export class CarrierStakingController {
     return this.stakingService.getBond(shipmentId);
   }
 
+  @Get('bonds')
+  listBonds(
+    @Query('carrierAddress') carrierAddress?: string,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.stakingService.listBonds({
+      carrierAddress,
+      status,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
   @Post('bond/resolve')
   @HttpCode(HttpStatus.OK)
   resolveBond(@Body() dto: ResolveBondDto) {
@@ -69,5 +85,24 @@ export class CarrierStakingController {
       manufacturerAddress,
       totalIndemnified: this.stakingService.getManufacturerIndemnity(manufacturerAddress),
     };
+  }
+
+  @Put('account/:carrierAddress/accreditation')
+  updateAccreditation(
+    @Param('carrierAddress') carrierAddress: string,
+    @Body() body: { isAccredited: boolean },
+  ) {
+    const account = this.stakingService.getAccount(carrierAddress);
+    account.isAccredited = body.isAccredited;
+    account.lastUpdated = Date.now();
+    return account;
+  }
+
+  @Delete('bond/:shipmentId')
+  cancelBond(
+    @Param('shipmentId') shipmentId: string,
+    @Query('reason') reason?: string,
+  ) {
+    return this.stakingService.cancelBond(shipmentId, reason);
   }
 }
