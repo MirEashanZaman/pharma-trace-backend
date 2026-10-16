@@ -46,6 +46,10 @@ export class ComplianceAuditLogger {
   getAuditTrail(): Array<{ timestamp: string; entry: string; hash: string }> {
     return [...this.logs];
   }
+
+  clearAuditTrail(): void {
+    this.logs.length = 0;
+  }
 }
 
 export class PharmacyDispenseNode implements ISerializedTracker {
