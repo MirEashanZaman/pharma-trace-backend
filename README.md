@@ -52,9 +52,32 @@ PharmaTrace-ES implements real-world enterprise design patterns directly within 
 | **W3C Verifiable Credentials (VC) & Presentation Exchange** | Decentralized Identity / Compliance | `src/blockchain/vc/verifiable-credential.service.ts`<br>`src/blockchain/vc/status-list-2021.registry.ts`<br>`src/blockchain/vc/vc.controller.ts` | Cryptographic JSON-LD / JWT Verifiable Credentials for Qualified Persons (QP) certifying GMP batch release and carrier accreditation, W3C StatusList2021 on-chain bitstring revocation registry with keccak256 state hashing, and Presentation Exchange (PEX 2.0) verification gating physical custody handovers. |
 | **Standard GS1 EPCIS 2.0 REST Query & OpenAPI** | Enterprise Interoperability / Standards | `src/blockchain/epcis/epcis-query.service.ts`<br>`src/blockchain/epcis/epcis-query.controller.ts`<br>`src/blockchain/epcis/epcis-query.dto.ts` | Standard `/epcis/events` query protocol implementing GS1 CBV filtering parameters (`EQ_bizStep`, `MATCH_epc`, `GE_eventTime`, `LE_eventTime`), event capture pipeline, pagination, and OpenAPI 3.0 specification for drop-in interoperability with enterprise ERP gateways (SAP ATTP, TraceLink). |
 | **Carrier Collateral Staking & Automated Slashing** | Economic Security / Smart Escrow | `contracts/CarrierStakingEscrow.sol`<br>`src/blockchain/escrow/carrier-staking.service.ts`<br>`src/blockchain/escrow/carrier-staking.controller.ts` | ERC-20 security deposit staking for cold-chain carriers requiring collateral bonds per shipment, coupled with autonomous bond slashing upon multi-sensor consensus temperature excursions to directly indemnify pharmaceutical manufacturers. |
+| **SOLID Architectural Principles Suite** | Software Architecture | `src/compliance/solid/`<br>`src/compliance/compliance.module.ts` | Complete production realization of SRP, OCP, LSP, ISP, and DIP for regulatory compliance evaluation, multi-target attestation anchoring, and role-segregated node contracts. |
 | **Singleton** | Creational | NestJS IoC Dependency Injection | Services (`@Injectable()`) are managed as thread-safe singletons across the entire application runtime. |
 
 All design patterns are verified with automated unit tests in `src/patterns.spec.ts`.
+
+---
+
+## SOLID Architectural Principles Implementation
+
+PharmaTrace-ES adheres strictly to SOLID object-oriented design principles within the `src/compliance/solid/` domain:
+
+* **S - Single Responsibility Principle (SRP)**:
+  * `RegulatoryRuleEvaluator`: Exclusively responsible for executing regulatory rule checks across payloads.
+  * `DossierCryptographicSigner`: Exclusively responsible for HMAC/SHA-256 cryptographic signing and digest generation.
+  * `ComplianceAuditLogger`: Exclusively responsible for append-only audit trail formatting and persistent event logging.
+* **O - Open/Closed Principle (OCP)**:
+  * `IComplianceRule` interface defines an extensible evaluation contract open for new jurisdictions but closed for core modification.
+  * Concrete rule implementations (`FdaDscsaRule`, `EuFmdRule`, `WhoColdChainRule`, `HealthCanadaRule`) can be added dynamically without altering engine or evaluator logic.
+* **L - Liskov Substitution Principle (LSP)**:
+  * `AbstractAttestationAnchor` provides standard contracts for blockchain attestation.
+  * Subclasses `DirectOnChainAnchor` (direct contract call) and `MerkleBatchedAnchor` (cryptographic Merkle root batching) can be substituted transparently anywhere an `AbstractAttestationAnchor` is consumed without violating system invariants.
+* **I - Interface Segregation Principle (ISP)**:
+  * Segregated client interfaces (`ISerializedTracker`, `IColdChainAuditor`, `ICustodySigner`, `ICollateralStakeholder`) ensure supply chain nodes depend only on capabilities relevant to their operational role.
+  * For example, `PharmacyDispenseNode` implements `ISerializedTracker` and `ICustodySigner` without being forced to implement cold-chain telemetry or carrier collateral staking.
+* **D - Dependency Inversion Principle (DIP)**:
+  * High-level orchestration module `ComplianceEngine` depends exclusively on abstractions (`IComplianceRule[]`, `AbstractAttestationAnchor`), injected dynamically via NestJS IoC dependency injection rather than tight coupling to low-level database or EVM RPC implementations.
 
 ---
 
@@ -95,6 +118,7 @@ pharma-trace-backend/
 ├── src/
 │   ├── auth/                          # Authentication & Wallet Signature Verification
 │   ├── blockchain/                    # Web3 Provider, Digital Twin, Escrow, KMS Signer & GS1 Link
+│   ├── compliance/                    # SOLID Architectural Compliance Engine & Anchors
 │   ├── drugs/                         # Drug Registration and Batch Management
 │   ├── events/                        # Event Sourcing, CQRS & Custody Saga Engine
 │   ├── iot/                           # Telemetry Checkpoints & Dynamic NFC Verification
