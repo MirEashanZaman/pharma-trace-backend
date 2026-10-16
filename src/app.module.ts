@@ -12,6 +12,7 @@ import { IotModule } from './iot/iot.module';
 import { LedgerModule } from './ledger/ledger.module';
 import { BlockchainModule } from './blockchain/blockchain.module';
 import { AuthModule } from './auth/auth.module';
+import { ComplianceModule } from './compliance/compliance.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AuthModule } from './auth/auth.module';
     LedgerModule,
     BlockchainModule,
     AuthModule,
+    ComplianceModule,
   ],
 
   controllers: [
