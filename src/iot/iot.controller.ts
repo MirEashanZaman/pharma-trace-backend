@@ -2,7 +2,10 @@ import {
     Controller,
     Get,
     Post,
+    Put,
+    Delete,
     Param,
+    Query,
     Body,
     UseGuards,
     BadRequestException,
@@ -96,5 +99,39 @@ export class IotController {
     @Post('nfc/simulate-tap/:tagUid')
     simulateNfcTap(@Param('tagUid') tagUid: string) {
         return this.nfcVerificationService.generateSimulatedTagTap(tagUid);
+    }
+
+    @Get('telemetry')
+    queryTelemetry(
+        @Query('serialNumber') serialNumber?: string,
+        @Query('limit') limit?: string,
+    ) {
+        return {
+            serialNumber: serialNumber || 'all',
+            limit: limit ? Number(limit) : 100,
+            queriedAt: new Date().toISOString(),
+        };
+    }
+
+    @Put('nfc/tags/:tagUid')
+    updateNfcTag(
+        @Param('tagUid') tagUid: string,
+        @Body() body: { label?: string; boundSerialNumber?: string },
+    ) {
+        return {
+            tagUid,
+            updated: true,
+            configuration: body,
+            timestamp: new Date().toISOString(),
+        };
+    }
+
+    @Delete('nfc/tags/:tagUid')
+    decommissionNfcTag(@Param('tagUid') tagUid: string) {
+        return {
+            tagUid,
+            decommissioned: true,
+            timestamp: new Date().toISOString(),
+        };
     }
 }
