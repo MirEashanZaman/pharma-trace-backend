@@ -190,7 +190,6 @@ export class AuthService implements OnModuleInit {
         return this.generateToken(user);
     }
 
-    
     async getProfile(userId: number) {
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user) {
@@ -198,6 +197,53 @@ export class AuthService implements OnModuleInit {
         }
         const { password, ...safeUser } = user;
         return safeUser;
+    }
+
+    async getUsers(role?: UserRole, limit?: number) {
+        const where: any = {};
+        if (role) {
+            where.role = role;
+        }
+        const users = await this.userRepository.find({
+            where: Object.keys(where).length > 0 ? where : undefined,
+            take: limit ? Number(limit) : undefined,
+            order: { id: 'ASC' },
+        });
+        return users.map(({ password, ...safeUser }) => safeUser);
+    }
+
+    async getUserById(id: number) {
+        const user = await this.userRepository.findOne({ where: { id } });
+        if (!user) {
+            throw new BadRequestException(`User with id ${id} not found`);
+        }
+        const { password, ...safeUser } = user;
+        return safeUser;
+    }
+
+    async updateProfile(userId: number, updateData: { fullName?: string; organization?: string }) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) {
+            throw new UnauthorizedException('User not found');
+        }
+        if (updateData.fullName !== undefined) {
+            user.fullName = updateData.fullName;
+        }
+        if (updateData.organization !== undefined) {
+            user.organization = updateData.organization;
+        }
+        const updated = await this.userRepository.save(user);
+        const { password, ...safeUser } = updated;
+        return safeUser;
+    }
+
+    async deleteUser(id: number) {
+        const user = await this.userRepository.findOne({ where: { id } });
+        if (!user) {
+            throw new BadRequestException(`User with id ${id} not found`);
+        }
+        await this.userRepository.remove(user);
+        return { deleted: true, id };
     }
 
     private generateToken(user: User) {
