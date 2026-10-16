@@ -41,6 +41,33 @@ import { PresentationDefinition, VerifiableCredential } from './blockchain/vc/vc
 import { EventType } from './events/event-type.enum';
 import { UserRole } from './auth/entities/user.entity';
 import { ethers } from 'ethers';
+import {
+    ComplianceData,
+    IComplianceRule,
+    RuleEvaluationResult,
+    ISerializedTracker,
+    IColdChainAuditor,
+    ICollateralStakeholder,
+} from './compliance/solid/compliance.types';
+import {
+    FdaDscsaRule,
+    EuFmdRule,
+    WhoColdChainRule,
+    HealthCanadaRule,
+} from './compliance/solid/rules/compliance-rules';
+import {
+    AbstractAttestationAnchor,
+    DirectOnChainAnchor,
+    MerkleBatchedAnchor,
+} from './compliance/solid/anchors/attestation-anchor';
+import {
+    RegulatoryRuleEvaluator,
+    DossierCryptographicSigner,
+    ComplianceAuditLogger,
+    PharmacyDispenseNode,
+    ReeferLogisticsCarrier,
+    ComplianceEngine,
+} from './compliance/solid/services/compliance-services';
 
 describe('Software Architecture & Design Patterns Specification Suite', () => {
     describe('1. Strategy Pattern & Strategy Factory', () => {
@@ -1967,7 +1994,175 @@ describe('Software Architecture & Design Patterns Specification Suite', () => {
             ).toThrow('Cannot unstake');
         });
     });
+
+    describe('29. SOLID Principles Specification Suite', () => {
+        const sampleData: ComplianceData = {
+            serialNumber: 'SN-SOLID-2026-001',
+            gtin: '00300018899201',
+            batchNumber: 'BATCH-SOLID-A1',
+            temperatures: [4.2, 4.5, 4.1, 4.8],
+            tamperSealIntact: true,
+            expiryDate: new Date(Date.now() + 86400000 * 365).toISOString(),
+            jurisdiction: 'GLOBAL',
+        };
+
+        describe('Single Responsibility Principle (SRP)', () => {
+            it('should verify evaluator only evaluates rules without side effects', () => {
+                const evaluator = new RegulatoryRuleEvaluator();
+                const rules: IComplianceRule[] = [new FdaDscsaRule(), new EuFmdRule(), new WhoColdChainRule()];
+                const results = evaluator.evaluateAll(rules, sampleData);
+
+                expect(results.length).toBe(3);
+                expect(results.every((r) => r.passed)).toBe(true);
+                expect(results[0].ruleId).toBe('FDA_DSCSA_TITLE_II');
+                expect(results[1].ruleId).toBe('EU_FMD_ANNEX_11');
+                expect(results[2].ruleId).toBe('WHO_TRS_961');
+            });
+
+            it('should verify signer only handles deterministic hashing and signatures', () => {
+                const signer = new DossierCryptographicSigner();
+                const digest1 = signer.computeDigest({ serial: 'SN-01', batch: 'B1' });
+                const digest2 = signer.computeDigest({ batch: 'B1', serial: 'SN-01' });
+
+                expect(digest1).toBe(digest2);
+                expect(digest1.startsWith('0x')).toBe(true);
+
+                const signature = signer.signDigest(digest1, 'SECRET_KEY_REGULATOR');
+                expect(signature).toBeDefined();
+                expect(typeof signature).toBe('string');
+            });
+
+            it('should verify audit logger only records immutable audit trails', () => {
+                const logger = new ComplianceAuditLogger();
+                const record = logger.logAudit('Evaluated FDA compliance for batch B1');
+
+                expect(record.timestamp).toBeDefined();
+                expect(record.hash).toBeDefined();
+                expect(logger.getAuditTrail().length).toBe(1);
+            });
+        });
+
+        describe('Open/Closed Principle (OCP)', () => {
+            it('should extend verification engine with new regulatory rules without modifying existing rules', () => {
+                class AnvisaBrazilRule implements IComplianceRule {
+                    readonly ruleId = 'ANVISA_RDC_301';
+                    readonly authority = 'Brazilian Health Regulatory Agency (ANVISA)';
+                    evaluate(data: ComplianceData): RuleEvaluationResult {
+                        const passed = Boolean(data.batchNumber && data.tamperSealIntact);
+                        return {
+                            ruleId: this.ruleId,
+                            authority: this.authority,
+                            passed,
+                            message: passed ? 'Complies with ANVISA RDC 301' : 'Failed ANVISA RDC 301',
+                            timestamp: new Date().toISOString(),
+                        };
+                    }
+                }
+
+                const evaluator = new RegulatoryRuleEvaluator();
+                const baseRules: IComplianceRule[] = [new FdaDscsaRule(), new EuFmdRule()];
+                const extendedRules: IComplianceRule[] = [...baseRules, new AnvisaBrazilRule()];
+
+                const baseResults = evaluator.evaluateAll(baseRules, sampleData);
+                const extendedResults = evaluator.evaluateAll(extendedRules, sampleData);
+
+                expect(baseResults.length).toBe(2);
+                expect(extendedResults.length).toBe(3);
+                expect(extendedResults[2].ruleId).toBe('ANVISA_RDC_301');
+                expect(extendedResults[2].passed).toBe(true);
+            });
+        });
+
+        describe('Liskov Substitution Principle (LSP)', () => {
+            async function executeAnchorVerificationPipeline(
+                anchor: AbstractAttestationAnchor,
+                batchId: string,
+                digest: string,
+            ): Promise<boolean> {
+                const receipt = await anchor.anchor(batchId, digest);
+                expect(receipt.batchId).toBe(batchId);
+                expect(receipt.digest).toBe(digest);
+                expect(receipt.txHash).toBeDefined();
+                expect(receipt.blockNumber).toBeGreaterThan(0);
+
+                return await anchor.verify(batchId, digest);
+            }
+
+            it('should substitute DirectOnChainAnchor seamlessly for AbstractAttestationAnchor', async () => {
+                const directAnchor = new DirectOnChainAnchor();
+                const isVerified = await executeAnchorVerificationPipeline(
+                    directAnchor,
+                    'BATCH-LSP-DIRECT',
+                    '0x1234567890abcdef',
+                );
+                expect(isVerified).toBe(true);
+            });
+
+            it('should substitute MerkleBatchedAnchor seamlessly for AbstractAttestationAnchor', async () => {
+                const merkleAnchor = new MerkleBatchedAnchor();
+                const isVerified = await executeAnchorVerificationPipeline(
+                    merkleAnchor,
+                    'BATCH-LSP-MERKLE',
+                    '0xabcdef1234567890',
+                );
+                expect(isVerified).toBe(true);
+            });
+        });
+
+        describe('Interface Segregation Principle (ISP)', () => {
+            it('should verify Pharmacy node only depends on ISerializedTracker interface', () => {
+                const pharmacy = new PharmacyDispenseNode(new Set(['SN-SOLID-2026-001', 'SN-SOLID-2026-002']));
+                const tracker: ISerializedTracker = pharmacy;
+
+                expect(tracker.verifySerialNumber('SN-SOLID-2026-001')).toBe(true);
+                expect(tracker.getLifecycleState('SN-SOLID-2026-001')).toBe('IN_STOCK');
+
+                pharmacy.dispense('SN-SOLID-2026-001');
+                expect(tracker.getLifecycleState('SN-SOLID-2026-001')).toBe('DISPENSED');
+                expect(tracker.verifySerialNumber('SN-SOLID-2026-001')).toBe(false);
+            });
+
+            it('should verify Carrier node only depends on IColdChainAuditor and ICollateralStakeholder', () => {
+                const carrier = new ReeferLogisticsCarrier('0x88f9B82462f6C4bf4a0Fb15e5c3971559a316e7f', 75000);
+                const auditor: IColdChainAuditor = carrier;
+                const stakeholder: ICollateralStakeholder = carrier;
+
+                expect(auditor.evaluateExcursions([3.5, 4.0, 5.2], 2.0, 8.0)).toBe(true);
+                expect(auditor.evaluateExcursions([1.5, 4.0, 5.2], 2.0, 8.0)).toBe(false);
+                expect(auditor.calculateMeanKineticTemperature([3.0, 5.0, 7.0])).toBe(5.0);
+
+                expect(stakeholder.getStakedBalance('0x88f9B82462f6C4bf4a0Fb15e5c3971559a316e7f')).toBe(75000);
+                expect(stakeholder.isCollateralSufficient('0x88f9B82462f6C4bf4a0Fb15e5c3971559a316e7f', 50000)).toBe(true);
+                expect(stakeholder.isCollateralSufficient('0x88f9B82462f6C4bf4a0Fb15e5c3971559a316e7f', 100000)).toBe(false);
+            });
+        });
+
+        describe('Dependency Inversion Principle (DIP)', () => {
+            it('should execute ComplianceEngine through abstract rules and anchor injection', async () => {
+                const evaluator = new RegulatoryRuleEvaluator();
+                const signer = new DossierCryptographicSigner();
+                const auditLogger = new ComplianceAuditLogger();
+                const anchor: AbstractAttestationAnchor = new MerkleBatchedAnchor();
+                const rules: IComplianceRule[] = [new FdaDscsaRule(), new EuFmdRule(), new WhoColdChainRule()];
+
+                const engine = new ComplianceEngine(evaluator, signer, auditLogger, anchor, rules);
+
+                const dossier = await engine.processDossier(sampleData, 'AUTHORITY_MASTER_KEY_001');
+
+                expect(dossier.isCompliant).toBe(true);
+                expect(dossier.results.length).toBe(3);
+                expect(dossier.digest).toBeDefined();
+                expect(dossier.signature).toBeDefined();
+                expect(dossier.anchorReceipt.mode).toBe('MERKLE_BATCH');
+
+                const isVerified = await engine.verifyAnchoredDossier(sampleData.batchNumber, dossier.digest);
+                expect(isVerified).toBe(true);
+                expect(auditLogger.getAuditTrail().length).toBeGreaterThanOrEqual(1);
+            });
+        });
+    });
 });
+
 
 
 
