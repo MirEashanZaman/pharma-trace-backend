@@ -197,6 +197,13 @@ export class GovernanceTimelockService {
     return proposal;
   }
 
+  async updateProposalDescription(proposalId: string, description: string): Promise<GovernanceProposal> {
+    const proposal = await this.getProposal(proposalId);
+    proposal.description = description;
+    this.proposals.set(proposalId, proposal);
+    return proposal;
+  }
+
   listProposals(): GovernanceProposal[] {
     return Array.from(this.proposals.values());
   }
