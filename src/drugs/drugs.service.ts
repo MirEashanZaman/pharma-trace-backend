@@ -45,12 +45,54 @@ export class DrugsService implements OnModuleInit {
         return this.drugRepository.save(drug);
     }
 
-    async getAllDrugs() {
+    async getAllDrugs(query?: {
+        manufacturer?: string;
+        batchNumber?: string;
+        limit?: number;
+        offset?: number;
+    }) {
+        const where: any = {};
+        if (query?.manufacturer) {
+            where.manufacturer = query.manufacturer;
+        }
+        if (query?.batchNumber) {
+            where.batchNumber = query.batchNumber;
+        }
         return this.drugRepository.find({
+            where: Object.keys(where).length > 0 ? where : undefined,
             order: {
                 id: 'ASC',
             },
+            take: query?.limit ? Number(query.limit) : undefined,
+            skip: query?.offset ? Number(query.offset) : undefined,
         });
+    }
+
+    async updateDrug(
+        serialNumber: string,
+        updateData: Partial<{
+            drugName: string;
+            manufacturer: string;
+            batchNumber: string;
+        }>,
+    ) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+        if (updateData.drugName !== undefined) {
+            drug.drugName = updateData.drugName;
+        }
+        if (updateData.manufacturer !== undefined) {
+            drug.manufacturer = updateData.manufacturer;
+        }
+        if (updateData.batchNumber !== undefined) {
+            drug.batchNumber = updateData.batchNumber;
+        }
+        return this.drugRepository.save(drug);
+    }
+
+    async deleteDrug(serialNumber: string) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+        await this.drugRepository.remove(drug);
+        return { deleted: true, serialNumber };
     }
 
     async getDrugBySerialNumber(serialNumber: string) {
