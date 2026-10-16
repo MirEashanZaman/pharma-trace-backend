@@ -124,6 +124,37 @@ export class CarrierStakingService {
     return bond;
   }
 
+  listBonds(query?: { carrierAddress?: string; status?: string; limit?: number }): ShipmentBond[] {
+    let result = Array.from(this.bonds.values());
+    if (query?.carrierAddress && isAddress(query.carrierAddress)) {
+      const normalized = getAddress(query.carrierAddress);
+      result = result.filter((b) => b.carrierAddress === normalized);
+    }
+    if (query?.status) {
+      result = result.filter((b) => b.status === query.status);
+    }
+    if (query?.limit) {
+      result = result.slice(0, Number(query.limit));
+    }
+    return result;
+  }
+
+  cancelBond(shipmentId: string, reason: string = 'Shipment cancelled prior to departure'): ShipmentBond {
+    const bond = this.getBond(shipmentId);
+    if (bond.status !== 'LOCKED') {
+      throw new BadRequestException(`Cannot cancel bond with status ${bond.status}`);
+    }
+    const carrier = this.getAccount(bond.carrierAddress);
+    carrier.lockedCollateral -= bond.bondAmount;
+    carrier.availableCollateral = carrier.totalStaked - carrier.lockedCollateral;
+    carrier.lastUpdated = Date.now();
+
+    bond.status = 'CANCELLED' as any;
+    bond.resolvedAt = Date.now();
+    bond.resolutionReason = reason;
+    return bond;
+  }
+
   evaluateAndResolveBond(
     shipmentId: string,
     sensorClusters: CheckpointCluster[],
