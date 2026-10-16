@@ -108,4 +108,31 @@ export class LedgerService {
 
         return true;
     }
+
+    getEntryByIndex(index: number): LedgerEntry | undefined {
+        return this.ledger[index];
+    }
+
+    filterLedger(drugSerialNumber?: string, limit?: number): LedgerEntry[] {
+        let entries = this.ledger;
+        if (drugSerialNumber) {
+            entries = entries.filter((e) => e.drugSerialNumber === drugSerialNumber);
+        }
+        if (limit) {
+            entries = entries.slice(0, Number(limit));
+        }
+        return entries;
+    }
+
+    updateEntryHash(index: number, newHash: string): boolean {
+        if (!this.ledger[index]) {
+            return false;
+        }
+        this.ledger[index].eventHash = newHash;
+        return true;
+    }
+
+    resetLedger(): void {
+        this.ledger.length = 0;
+    }
 }
