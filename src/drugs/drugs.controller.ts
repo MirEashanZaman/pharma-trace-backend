@@ -3,7 +3,10 @@ import {
     Post,
     Body,
     Get,
+    Put,
+    Delete,
     Param,
+    Query,
     Header,
     UseGuards,
 } from '@nestjs/common';
@@ -36,8 +39,18 @@ export class DrugsController {
     }
 
     @Get()
-    getAllDrugs() {
-        return this.drugsService.getAllDrugs();
+    getAllDrugs(
+        @Query('manufacturer') manufacturer?: string,
+        @Query('batchNumber') batchNumber?: string,
+        @Query('limit') limit?: string,
+        @Query('offset') offset?: string,
+    ) {
+        return this.drugsService.getAllDrugs({
+            manufacturer,
+            batchNumber,
+            limit: limit ? Number(limit) : undefined,
+            offset: offset ? Number(offset) : undefined,
+        });
     }
 
     @Get(':serialNumber/events')
@@ -68,5 +81,29 @@ export class DrugsController {
         @Param('serialNumber') serialNumber: string,
     ) {
         return this.drugsService.getDrugBySerialNumber(serialNumber);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.MANUFACTURER, UserRole.ADMIN)
+    @Put(':serialNumber')
+    updateDrug(
+        @Param('serialNumber') serialNumber: string,
+        @Body()
+        updateData: {
+            drugName?: string;
+            manufacturer?: string;
+            batchNumber?: string;
+        },
+    ) {
+        return this.drugsService.updateDrug(serialNumber, updateData);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    @Delete(':serialNumber')
+    deleteDrug(
+        @Param('serialNumber') serialNumber: string,
+    ) {
+        return this.drugsService.deleteDrug(serialNumber);
     }
 }
