@@ -223,6 +223,17 @@ export class EpcisQueryService {
     return event;
   }
 
+  updateEventDisposition(eventID: string, disposition: string): EpcisJsonLdEvent & { eventID: string } {
+    const event = this.getEventById(eventID);
+    event.disposition = disposition;
+    this.eventStore.set(eventID, event);
+    return event;
+  }
+
+  deleteEvent(eventID: string): boolean {
+    return this.eventStore.delete(eventID);
+  }
+
   getEpcisVersion(): {
     version: string;
     standardsVersion: string;
