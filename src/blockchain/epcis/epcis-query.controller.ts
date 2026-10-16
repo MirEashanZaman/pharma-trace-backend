@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
   Query,
   Param,
@@ -88,5 +90,27 @@ export class EpcisQueryController {
   @Get('openapi.json')
   getOpenApiSpec() {
     return this.epcisQueryService.getOpenApiSpec();
+  }
+
+  @Put('events/:eventID')
+  updateEventDisposition(
+    @Param('eventID') eventID: string,
+    @Body() body: { disposition: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.setHeader('GS1-EPCIS-Version', '2.0');
+    res.setHeader('GS1-CBV-Version', '2.0');
+    return this.epcisQueryService.updateEventDisposition(eventID, body.disposition);
+  }
+
+  @Delete('events/:eventID')
+  deleteEvent(
+    @Param('eventID') eventID: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.setHeader('GS1-EPCIS-Version', '2.0');
+    res.setHeader('GS1-CBV-Version', '2.0');
+    const deleted = this.epcisQueryService.deleteEvent(eventID);
+    return { deleted, eventID };
   }
 }
