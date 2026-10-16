@@ -74,4 +74,15 @@ export class IpfsService {
     getAllPinnedDossiers(): IpfsPinnedDossier[] {
         return Array.from(this.pinnedStorage.values()).map((v) => v.dossier);
     }
+
+    unpinJson(cid: string): boolean {
+        return this.pinnedStorage.delete(cid);
+    }
+
+    updateDossierMetadata(cid: string, name: string): IpfsPinnedDossier | undefined {
+        const record = this.pinnedStorage.get(cid);
+        if (!record) return undefined;
+        record.dossier.metadataName = name;
+        return record.dossier;
+    }
 }
