@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ComplianceController } from './compliance.controller';
 import {
   RegulatoryRuleEvaluator,
   DossierCryptographicSigner,
@@ -17,6 +18,7 @@ import {
 } from './solid/rules/compliance-rules';
 
 @Module({
+  controllers: [ComplianceController],
   providers: [
     RegulatoryRuleEvaluator,
     DossierCryptographicSigner,
