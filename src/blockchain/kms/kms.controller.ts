@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { KmsSignerService } from './kms-signer.service';
 import type { KmsKeyMetadata, KmsSignatureResult } from './kms-signer.service';
 
@@ -7,8 +7,12 @@ export class KmsController {
   constructor(private readonly kmsService: KmsSignerService) {}
 
   @Get('keys')
-  listKeys(): KmsKeyMetadata[] {
-    return this.kmsService.listKeys();
+  listKeys(@Query('provider') provider?: string): KmsKeyMetadata[] {
+    const keys = this.kmsService.listKeys();
+    if (provider) {
+      return keys.filter((k) => k.hsmProvider === provider);
+    }
+    return keys;
   }
 
   @Get('keys/:keyId')
@@ -40,5 +44,19 @@ export class KmsController {
       body.hsmProvider,
       body.seedOrKeyHex,
     );
+  }
+
+  @Put('keys/:keyId')
+  updateKey(
+    @Param('keyId') keyId: string,
+    @Body() body: { label?: string; enabled?: boolean },
+  ): KmsKeyMetadata {
+    return this.kmsService.updateKeyMetadata(keyId, body);
+  }
+
+  @Delete('keys/:keyId')
+  deleteKey(@Param('keyId') keyId: string): { deleted: boolean; keyId: string } {
+    const deleted = this.kmsService.deregisterKey(keyId);
+    return { deleted, keyId };
   }
 }
