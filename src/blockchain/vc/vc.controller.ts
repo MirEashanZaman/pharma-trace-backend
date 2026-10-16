@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { VerifiableCredentialService } from './verifiable-credential.service';
 import { StatusList2021Registry } from './status-list-2021.registry';
 import { Wallet } from 'ethers';
@@ -90,5 +90,42 @@ export class VcController {
     return this.statusListRegistry.exportStatusListCredential(
       'did:ethr:0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
     );
+  }
+
+  @Get('status/:index')
+  checkStatus(@Param('index') index: string) {
+    const idx = Number(index);
+    const isRevoked = this.statusListRegistry.isRevoked(idx);
+    const record = this.statusListRegistry.getRevocationRecord(idx);
+    return {
+      index: idx,
+      isRevoked,
+      record: record || null,
+    };
+  }
+
+  @Put('status/:index')
+  updateStatusReason(
+    @Param('index') index: string,
+    @Body() body: { reason: string },
+  ) {
+    const idx = Number(index);
+    const record = this.statusListRegistry.getRevocationRecord(idx);
+    if (record) {
+      record.reason = body.reason;
+    }
+    return { index: idx, updated: !!record, record };
+  }
+
+  @Delete('revoke/:credentialId')
+  revokeByDelete(
+    @Param('credentialId') credentialId: string,
+    @Query('index') index?: string,
+    @Query('revokedBy') revokedBy?: string,
+    @Query('reason') reason?: string,
+  ) {
+    const idx = index !== undefined ? Number(index) : 0;
+    const author = revokedBy || 'did:ethr:0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+    return this.vcService.revokeCredential(credentialId, idx, author, reason);
   }
 }
