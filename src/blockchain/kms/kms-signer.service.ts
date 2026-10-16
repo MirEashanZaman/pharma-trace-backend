@@ -107,6 +107,24 @@ export class KmsSignerService {
     return Array.from(this.keyRegistry.values());
   }
 
+  updateKeyMetadata(keyId: string, updates: { label?: string; enabled?: boolean }): KmsKeyMetadata {
+    const meta = this.getKeyMetadata(keyId);
+    if (updates.label !== undefined) {
+      meta.label = updates.label;
+    }
+    if (updates.enabled !== undefined) {
+      meta.enabled = updates.enabled;
+    }
+    this.keyRegistry.set(keyId, meta);
+    return meta;
+  }
+
+  deregisterKey(keyId: string): boolean {
+    const existed = this.keyRegistry.delete(keyId);
+    this.enclaveSigners.delete(keyId);
+    return existed;
+  }
+
   parseAsn1DerSignature(derBuffer: Buffer): { r: string; s: string } {
     if (derBuffer[0] !== 0x30) {
       throw new BadRequestException('Invalid ASN.1 DER sequence header');
