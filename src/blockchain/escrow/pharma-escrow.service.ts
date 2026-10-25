@@ -1,10 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
-import { keccak256, toUtf8Bytes, getAddress, isAddress } from 'ethers';
+import { Injectable, BadRequestException, NotFoundException, Logger, Optional } from '@nestjs/common';
+import { keccak256, toUtf8Bytes, getAddress, isAddress, parseEther } from 'ethers';
 import {
   SensorConsensusEngine,
   CheckpointCluster,
   EscrowConsensusReport,
 } from '../../iot/consensus/sensor-consensus.engine';
+import { BlockchainService } from '../blockchain.service';
 
 export enum EscrowState {
   FUNDED = 'FUNDED',
@@ -43,6 +44,7 @@ export class PharmaEscrowService {
 
   constructor(
     private readonly consensusEngine: SensorConsensusEngine = new SensorConsensusEngine(),
+    @Optional() private readonly blockchainService?: BlockchainService,
   ) {}
 
   async createEscrowOrder(dto: CreateEscrowDto): Promise<EscrowRecord> {
@@ -58,6 +60,23 @@ export class PharmaEscrowService {
     const orderId = keccak256(toUtf8Bytes(payload));
     const nowSec = Math.floor(Date.now() / 1000);
     const timeoutSec = (dto.timeoutHours ?? 72) * 3600;
+
+    const contract = this.blockchainService?.getEscrowContract();
+    if (contract) {
+      try {
+        const tx = await contract.createEscrow(
+          orderId,
+          getAddress(dto.seller),
+          dto.drugSerialNumber,
+          timeoutSec,
+          { value: parseEther(dto.amountEth.toString()) },
+        );
+        const receipt = await tx.wait();
+        this.logger.log(`Created escrow on-chain: ${receipt.hash}`);
+      } catch (err: any) {
+        this.logger.warn(`On-chain escrow creation failed: ${err.message}`);
+      }
+    }
 
     const record: EscrowRecord = {
       orderId,
@@ -115,10 +134,26 @@ export class PharmaEscrowService {
       };
     }
 
+    let settlementTxHash: string | undefined;
+    const contract = this.blockchainService?.getEscrowContract();
+    if (contract) {
+      try {
+        const tx = await contract.recordComplianceAndHandshake(orderId, true, true);
+        const receipt = await tx.wait();
+        settlementTxHash = receipt.hash;
+        this.logger.log(`On-chain escrow settlement executed: ${settlementTxHash}`);
+      } catch (err: any) {
+        this.logger.warn(`On-chain escrow settlement failed: ${err.message}`);
+      }
+    }
+    if (!settlementTxHash) {
+      settlementTxHash = keccak256(toUtf8Bytes(`SETTLE:${orderId}:${Date.now()}`));
+    }
+
     order.coldChainCompliant = true;
     order.custodyAccepted = true;
     order.status = EscrowState.RELEASED;
-    order.settlementTxHash = keccak256(toUtf8Bytes(`SETTLE:${orderId}:${Date.now()}`));
+    order.settlementTxHash = settlementTxHash;
 
     this.escrows.set(orderId, order);
     this.logger.log(`Escrow ${orderId} released to seller ${order.seller} (${order.amountEth} ETH)`);
@@ -181,10 +216,26 @@ export class PharmaEscrowService {
       };
     }
 
+    let settlementTxHash: string | undefined;
+    const consensusContract = this.blockchainService?.getEscrowContract();
+    if (consensusContract) {
+      try {
+        const tx = await consensusContract.recordComplianceAndHandshake(orderId, true, true);
+        const receipt = await tx.wait();
+        settlementTxHash = receipt.hash;
+        this.logger.log(`On-chain consensus settlement executed: ${settlementTxHash}`);
+      } catch (err: any) {
+        this.logger.warn(`On-chain consensus settlement failed: ${err.message}`);
+      }
+    }
+    if (!settlementTxHash) {
+      settlementTxHash = keccak256(toUtf8Bytes(`SETTLE_CONSENSUS:${orderId}:${Date.now()}`));
+    }
+
     order.coldChainCompliant = true;
     order.custodyAccepted = true;
     order.status = EscrowState.RELEASED;
-    order.settlementTxHash = keccak256(toUtf8Bytes(`SETTLE_CONSENSUS:${orderId}:${Date.now()}`));
+    order.settlementTxHash = settlementTxHash;
 
     this.escrows.set(orderId, order);
     this.logger.log(
@@ -204,6 +255,17 @@ export class PharmaEscrowService {
 
     if (order.status === EscrowState.RELEASED) {
       throw new BadRequestException('Cannot refund an escrow order that has already been released');
+    }
+
+    const contract = this.blockchainService?.getEscrowContract();
+    if (contract) {
+      try {
+        const tx = await contract.triggerSpoilageRefund(orderId, reason);
+        await tx.wait();
+        this.logger.log(`On-chain escrow refund triggered: ${orderId}`);
+      } catch (err: any) {
+        this.logger.warn(`On-chain escrow refund failed: ${err.message}`);
+      }
     }
 
     order.status = EscrowState.REFUNDED;
