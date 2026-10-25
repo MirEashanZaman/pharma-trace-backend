@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-interface IERC20 {
-    function transfer(address to, uint256 amount) external returns (bool);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-}
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract CarrierStakingEscrow {
+contract CarrierStakingEscrow is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     address public owner;
     IERC20 public immutable stakingToken;
 
@@ -52,9 +52,9 @@ contract CarrierStakingEscrow {
         stakingToken = IERC20(_stakingToken);
     }
 
-    function stakeCollateral(uint256 amount) external {
+    function stakeCollateral(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be greater than zero");
-        require(stakingToken.transferFrom(msg.sender, address(this), amount), "ERC-20 transferFrom failed");
+        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
 
         CarrierAccount storage account = carriers[msg.sender];
         account.totalStaked += amount;
@@ -63,7 +63,7 @@ contract CarrierStakingEscrow {
         emit CarrierStaked(msg.sender, amount, account.totalStaked);
     }
 
-    function unstakeCollateral(uint256 amount) external {
+    function unstakeCollateral(uint256 amount) external nonReentrant {
         CarrierAccount storage account = carriers[msg.sender];
         require(amount > 0, "Amount must be greater than zero");
         require(account.totalStaked - account.lockedCollateral >= amount, "Insufficient unlocked collateral");
@@ -73,7 +73,7 @@ contract CarrierStakingEscrow {
             account.isAccredited = false;
         }
 
-        require(stakingToken.transfer(msg.sender, amount), "ERC-20 transfer failed");
+        stakingToken.safeTransfer(msg.sender, amount);
         emit CarrierUnstaked(msg.sender, amount, account.totalStaked);
     }
 
@@ -123,7 +123,7 @@ contract CarrierStakingEscrow {
         uint256 slashPercentage,
         string calldata excursionReason,
         bytes32 consensusReportHash
-    ) external onlyOwner {
+    ) external onlyOwner nonReentrant {
         require(slashPercentage > 0 && slashPercentage <= 100, "Invalid slash percentage");
         ShipmentBond storage bond = bonds[shipmentId];
         require(bond.status == BondStatus.LOCKED, "Bond is not locked");
@@ -140,7 +140,7 @@ contract CarrierStakingEscrow {
         bond.resolvedAt = block.timestamp;
         bond.resolutionReason = excursionReason;
 
-        require(stakingToken.transfer(bond.manufacturer, slashedAmount), "Indemnity transfer to manufacturer failed");
+        stakingToken.safeTransfer(bond.manufacturer, slashedAmount);
 
         emit BondSlashed(shipmentId, bond.carrier, bond.manufacturer, slashedAmount, excursionReason, consensusReportHash);
     }
