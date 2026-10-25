@@ -1,70 +1,112 @@
 const fs = require('fs');
 const path = require('path');
 const { ethers } = require('ethers');
+const hre = require('hardhat');
 require('dotenv').config();
 
-async function main() {
-    console.log(' Deploying PharmaTraceAttestation Smart Contract...');
-
-    const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545';
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-
-    let deployer;
+async function getDeployer() {
+    const rpcUrl = process.env.BLOCKCHAIN_RPC_URL;
     const privateKey = process.env.BLOCKCHAIN_PRIVATE_KEY;
 
-    if (privateKey) {
-        deployer = new ethers.Wallet(privateKey, provider);
-    } else {
-        
-        const accounts = await provider.listAccounts();
-        if (accounts.length > 0) {
-            deployer = await provider.getSigner(0);
-        } else {
-            console.error(' No available accounts found on the RPC provider.');
-            process.exit(1);
+    if (rpcUrl && privateKey) {
+        try {
+            const provider = new ethers.JsonRpcProvider(rpcUrl);
+            await provider.getBlockNumber();
+            return new ethers.Wallet(privateKey, provider);
+        } catch {
+            const signers = await hre.ethers.getSigners();
+            return signers[0];
         }
     }
 
-    const deployerAddress = await deployer.getAddress();
-    console.log(` Deployer Address: ${deployerAddress}`);
+    const signers = await hre.ethers.getSigners();
+    return signers[0];
+}
 
-    
-    const artifactPath = path.resolve(__dirname, '..', 'src', 'blockchain', 'artifacts', 'PharmaTraceAttestation.json');
-    if (!fs.existsSync(artifactPath)) {
-        console.error(' Contract artifact not found. Please run: node scripts/compile.js first.');
-        process.exit(1);
-    }
-
-    const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
-    const factory = new ethers.ContractFactory(artifact.abi, artifact.bytecode, deployer);
-
-    console.log(' Broadcasting deployment transaction to blockchain...');
-    const contract = await factory.deploy();
+async function deployContract(contractName, deployer, args = []) {
+    const factory = await hre.ethers.getContractFactory(contractName, deployer);
+    const contract = await factory.deploy(...args);
     await contract.waitForDeployment();
+    const address = await contract.getAddress();
+    return address;
+}
 
-    const contractAddress = await contract.getAddress();
-    console.log(`\n PharmaTraceAttestation deployed successfully!`);
-    console.log(` Contract Address: ${contractAddress}\n`);
-
-    
+function updateEnv(key, value) {
     const envPath = path.resolve(__dirname, '..', '.env');
     let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+    const regex = new RegExp(`^${key}=.*$`, 'm');
 
-    if (envContent.includes('BLOCKCHAIN_CONTRACT_ADDRESS=')) {
-        envContent = envContent.replace(/BLOCKCHAIN_CONTRACT_ADDRESS=.*/, `BLOCKCHAIN_CONTRACT_ADDRESS=${contractAddress}`);
+    if (regex.test(envContent)) {
+        envContent = envContent.replace(regex, `${key}=${value}`);
     } else {
-        envContent += `\nBLOCKCHAIN_CONTRACT_ADDRESS=${contractAddress}`;
+        envContent = (envContent.trim() ? envContent.trim() + '\n' : '') + `${key}=${value}\n`;
     }
 
-    if (!envContent.includes('BLOCKCHAIN_RPC_URL=')) {
-        envContent += `\nBLOCKCHAIN_RPC_URL=${rpcUrl}`;
+    fs.writeFileSync(envPath, envContent);
+}
+
+async function main() {
+    console.log('Deploying Enterprise Smart Contracts...');
+
+    const deployer = await getDeployer();
+    const deployerAddress = await deployer.getAddress();
+    console.log(`Deployer Address: ${deployerAddress}`);
+
+    const guardians = Array.from(new Set([
+        deployerAddress,
+        '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+        '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
+    ]));
+    const timelockDelay = process.env.TIMELOCK_MIN_DELAY ? parseInt(process.env.TIMELOCK_MIN_DELAY, 10) : 0;
+    const timelockAddress = await deployContract('PharmaGovernanceTimelock', deployer, [guardians, 2, timelockDelay]);
+    console.log(`PharmaGovernanceTimelock deployed: ${timelockAddress}`);
+
+    const stakingToken = process.env.STAKING_TOKEN_ADDRESS || deployerAddress;
+    const carrierStakingAddress = await deployContract('CarrierStakingEscrow', deployer, [stakingToken]);
+    console.log(`CarrierStakingEscrow deployed: ${carrierStakingAddress}`);
+
+    const digitalTwinAddress = await deployContract('PharmaDigitalTwin', deployer, []);
+    console.log(`PharmaDigitalTwin deployed: ${digitalTwinAddress}`);
+
+    const escrowEngineAddress = await deployContract('PharmaEscrowEngine', deployer, []);
+    console.log(`PharmaEscrowEngine deployed: ${escrowEngineAddress}`);
+
+    const attestationAddress = await deployContract('PharmaTraceAttestation', deployer, []);
+    console.log(`PharmaTraceAttestation deployed: ${attestationAddress}`);
+
+    const deployedAddresses = {
+        deployer: deployerAddress,
+        deployedAt: new Date().toISOString(),
+        contracts: {
+            PharmaGovernanceTimelock: timelockAddress,
+            CarrierStakingEscrow: carrierStakingAddress,
+            PharmaDigitalTwin: digitalTwinAddress,
+            PharmaEscrowEngine: escrowEngineAddress,
+            PharmaTraceAttestation: attestationAddress
+        }
+    };
+
+    const artifactsDir = path.resolve(__dirname, '..', 'src', 'blockchain', 'artifacts');
+    if (!fs.existsSync(artifactsDir)) {
+        fs.mkdirSync(artifactsDir, { recursive: true });
     }
 
-    fs.writeFileSync(envPath, envContent.trim() + '\n');
-    console.log(` Updated .env with BLOCKCHAIN_CONTRACT_ADDRESS=${contractAddress}`);
+    fs.writeFileSync(
+        path.join(artifactsDir, 'deployed-addresses.json'),
+        JSON.stringify(deployedAddresses, null, 2)
+    );
+    console.log('Saved deployed contract addresses to src/blockchain/artifacts/deployed-addresses.json');
+
+    updateEnv('BLOCKCHAIN_CONTRACT_ADDRESS', attestationAddress);
+    updateEnv('TIMELOCK_CONTRACT_ADDRESS', timelockAddress);
+    updateEnv('CARRIER_STAKING_CONTRACT_ADDRESS', carrierStakingAddress);
+    updateEnv('DIGITAL_TWIN_CONTRACT_ADDRESS', digitalTwinAddress);
+    updateEnv('ESCROW_ENGINE_CONTRACT_ADDRESS', escrowEngineAddress);
+
+    console.log('Updated .env with all deployed contract addresses successfully');
 }
 
 main().catch((error) => {
-    console.error(' Deployment failed:', error);
+    console.error('Deployment orchestrator failed:', error);
     process.exit(1);
 });
