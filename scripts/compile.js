@@ -30,7 +30,24 @@ const input = {
   },
 };
 
-const output = JSON.parse(solc.compile(JSON.stringify(input)));
+function findImports(importPath) {
+  try {
+    let resolvedPath;
+    if (importPath.startsWith('@openzeppelin/')) {
+      resolvedPath = path.resolve(__dirname, '..', 'node_modules', importPath);
+    } else {
+      resolvedPath = path.resolve(contractsDir, importPath);
+    }
+    if (fs.existsSync(resolvedPath)) {
+      return { contents: fs.readFileSync(resolvedPath, 'utf8') };
+    }
+    return { error: 'File not found: ' + importPath };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+const output = JSON.parse(solc.compile(JSON.stringify(input), { import: findImports }));
 
 if (output.errors) {
   output.errors.forEach((err) => {
