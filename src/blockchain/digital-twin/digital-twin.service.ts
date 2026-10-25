@@ -1,5 +1,6 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger, Optional } from '@nestjs/common';
 import { keccak256, toUtf8Bytes, getAddress, isAddress } from 'ethers';
+import { BlockchainService } from '../blockchain.service';
 
 export enum DigitalTwinStatus {
   MINTED = 'MINTED',
@@ -21,6 +22,7 @@ export interface DigitalTwinRecord {
   mintedAt: number;
   burnedAt?: number;
   dispensedBy?: string;
+  transactionHash?: string;
 }
 
 export interface MintTwinDto {
@@ -38,6 +40,10 @@ export class DigitalTwinService {
   private readonly registry: Map<string, DigitalTwinRecord> = new Map();
   private readonly serialIndex: Map<string, string> = new Map();
 
+  constructor(
+    @Optional() private readonly blockchainService?: BlockchainService,
+  ) {}
+
   async mintDigitalTwin(dto: MintTwinDto): Promise<DigitalTwinRecord> {
     if (!isAddress(dto.holderAddress)) {
       throw new BadRequestException('Invalid recipient Ethereum address');
@@ -49,6 +55,26 @@ export class DigitalTwinService {
 
     const payload = `${dto.gtin}:${dto.batchNumber}:${dto.serialNumber}`;
     const tokenId = keccak256(toUtf8Bytes(payload));
+    let transactionHash: string | undefined;
+
+    const contract = this.blockchainService?.getDigitalTwinContract();
+    if (contract) {
+      try {
+        const tx = await contract.mintTwin(
+          getAddress(dto.holderAddress),
+          dto.gtin,
+          dto.batchNumber,
+          dto.serialNumber,
+          dto.expirationDate,
+          dto.ipfsDossierCid,
+        );
+        const receipt = await tx.wait();
+        transactionHash = receipt.hash;
+        this.logger.log(`Minted digital twin on-chain: ${transactionHash}`);
+      } catch (err: any) {
+        this.logger.warn(`On-chain digital twin minting failed: ${err.message}`);
+      }
+    }
 
     const record: DigitalTwinRecord = {
       tokenId,
@@ -60,6 +86,7 @@ export class DigitalTwinService {
       currentHolder: getAddress(dto.holderAddress),
       ipfsDossierCid: dto.ipfsDossierCid,
       mintedAt: Date.now(),
+      transactionHash,
     };
 
     this.registry.set(tokenId, record);
@@ -84,6 +111,17 @@ export class DigitalTwinService {
 
     record.currentHolder = normalizedTo;
     record.status = DigitalTwinStatus.IN_TRANSIT;
+
+    const contract = this.blockchainService?.getDigitalTwinContract();
+    if (contract) {
+      try {
+        const tx = await contract.transferCustody(normalizedFrom, normalizedTo, record.tokenId);
+        await tx.wait();
+      } catch (err: any) {
+        this.logger.warn(`On-chain custody transfer failed: ${err.message}`);
+      }
+    }
+
     this.registry.set(record.tokenId, record);
     return record;
   }
@@ -105,6 +143,16 @@ export class DigitalTwinService {
     record.dispensedBy = normalizedDispenser;
     record.currentHolder = '0x0000000000000000000000000000000000000000';
 
+    const contract = this.blockchainService?.getDigitalTwinContract();
+    if (contract) {
+      try {
+        const tx = await contract.burnOnDispense(serialNumber, normalizedDispenser);
+        await tx.wait();
+      } catch (err: any) {
+        this.logger.warn(`On-chain digital twin burn failed: ${err.message}`);
+      }
+    }
+
     this.registry.set(record.tokenId, record);
     this.logger.log(`Burned digital twin ${record.tokenId} for serial ${serialNumber} upon patient dispense`);
     return record;
@@ -119,6 +167,33 @@ export class DigitalTwinService {
     details?: DigitalTwinRecord;
   }> {
     const tokenId = this.serialIndex.get(serialNumber);
+    const contract = this.blockchainService?.getDigitalTwinContract();
+    if (contract) {
+      try {
+        const result = await contract.verifyAuthenticity(serialNumber);
+        if (result.exists) {
+          const onChainStatus = [
+            DigitalTwinStatus.MINTED,
+            DigitalTwinStatus.IN_TRANSIT,
+            DigitalTwinStatus.DELIVERED,
+            DigitalTwinStatus.DISPENSED,
+            DigitalTwinStatus.BURNED,
+          ][Number(result.status)] || DigitalTwinStatus.MINTED;
+
+          return {
+            exists: true,
+            isAuthentic: result.isAuthentic,
+            isBurned: result.isBurned,
+            status: onChainStatus,
+            holder: result.holder,
+            details: tokenId ? this.registry.get(tokenId) : undefined,
+          };
+        }
+      } catch (err: any) {
+        this.logger.warn(`On-chain authenticity verification failed: ${err.message}`);
+      }
+    }
+
     if (!tokenId || !this.registry.has(tokenId)) {
       return {
         exists: false,
