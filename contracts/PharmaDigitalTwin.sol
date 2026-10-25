@@ -57,7 +57,7 @@ contract PharmaDigitalTwin {
         require(msg.sender == owner || roles[MANUFACTURER_ROLE][msg.sender], "Unauthorized to mint digital twin");
         require(serialToTokenId[serialNumber] == 0, "Serial twin already exists");
 
-        uint256 tokenId = uint256(keccak256(abi.encodePacked(gtin, batchNumber, serialNumber)));
+        uint256 tokenId = uint256(keccak256(abi.encode(gtin, batchNumber, serialNumber)));
         balances[tokenId][to] = 1;
         serialToTokenId[serialNumber] = tokenId;
 
