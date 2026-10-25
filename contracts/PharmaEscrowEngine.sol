@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract PharmaEscrowEngine {
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract PharmaEscrowEngine is ReentrancyGuard {
     address public owner;
 
     enum EscrowStatus { INITIALIZED, FUNDED, RELEASED, REFUNDED, DISPUTED }
@@ -21,6 +23,7 @@ contract PharmaEscrowEngine {
 
     mapping(bytes32 => EscrowOrder) public escrows;
     bytes32[] public activeOrderIds;
+    mapping(bytes32 => uint256) private activeOrderIdIndex;
 
     event EscrowFunded(bytes32 indexed orderId, address indexed buyer, address indexed seller, uint256 amountWei, string drugSerialNumber);
     event EscrowReleased(bytes32 indexed orderId, address indexed seller, uint256 amountWei);
@@ -35,6 +38,18 @@ contract PharmaEscrowEngine {
 
     constructor() {
         owner = msg.sender;
+    }
+
+    function _removeActiveOrder(bytes32 orderId) internal {
+        uint256 index = activeOrderIdIndex[orderId];
+        uint256 lastIndex = activeOrderIds.length - 1;
+        if (index != lastIndex) {
+            bytes32 lastOrderId = activeOrderIds[lastIndex];
+            activeOrderIds[index] = lastOrderId;
+            activeOrderIdIndex[lastOrderId] = index;
+        }
+        activeOrderIds.pop();
+        delete activeOrderIdIndex[orderId];
     }
 
     function createEscrow(
@@ -60,6 +75,7 @@ contract PharmaEscrowEngine {
             custodyAccepted: false
         });
 
+        activeOrderIdIndex[orderId] = activeOrderIds.length;
         activeOrderIds.push(orderId);
 
         emit EscrowFunded(orderId, msg.sender, seller, msg.value, drugSerialNumber);
@@ -70,7 +86,7 @@ contract PharmaEscrowEngine {
         bytes32 orderId,
         bool coldChainCompliant,
         bool custodyAccepted
-    ) external {
+    ) external nonReentrant {
         EscrowOrder storage order = escrows[orderId];
         require(order.amountWei > 0, "Escrow not found");
         require(order.status == EscrowStatus.FUNDED, "Escrow not in funded state");
@@ -83,6 +99,7 @@ contract PharmaEscrowEngine {
 
         if (coldChainCompliant && custodyAccepted) {
             order.status = EscrowStatus.RELEASED;
+            _removeActiveOrder(orderId);
             uint256 payout = order.amountWei;
             order.amountWei = 0;
             (bool success, ) = payable(order.seller).call{value: payout}("");
@@ -91,13 +108,14 @@ contract PharmaEscrowEngine {
         }
     }
 
-    function triggerSpoilageRefund(bytes32 orderId, string calldata breachReason) external {
+    function triggerSpoilageRefund(bytes32 orderId, string calldata breachReason) external nonReentrant {
         EscrowOrder storage order = escrows[orderId];
         require(order.amountWei > 0, "Escrow not found");
         require(order.status == EscrowStatus.FUNDED, "Escrow not in funded state");
         require(msg.sender == owner || msg.sender == order.buyer, "Unauthorized to trigger refund");
 
         order.status = EscrowStatus.REFUNDED;
+        _removeActiveOrder(orderId);
         uint256 refundAmount = order.amountWei;
         order.amountWei = 0;
         (bool success, ) = payable(order.buyer).call{value: refundAmount}("");
@@ -107,7 +125,8 @@ contract PharmaEscrowEngine {
     }
 
     function checkUpkeep(bytes calldata) external view returns (bool upkeepNeeded, bytes memory performData) {
-        for (uint256 i = 0; i < activeOrderIds.length; i++) {
+        uint256 total = activeOrderIds.length;
+        for (uint256 i = 0; i < total; i++) {
             bytes32 id = activeOrderIds[i];
             EscrowOrder memory order = escrows[id];
             if (order.status == EscrowStatus.FUNDED && order.amountWei > 0) {
@@ -122,7 +141,7 @@ contract PharmaEscrowEngine {
         return (false, "");
     }
 
-    function performUpkeep(bytes calldata performData) external {
+    function performUpkeep(bytes calldata performData) external nonReentrant {
         (bytes32 orderId, uint8 actionType) = abi.decode(performData, (bytes32, uint8));
         EscrowOrder storage order = escrows[orderId];
         require(order.status == EscrowStatus.FUNDED && order.amountWei > 0, "Escrow not eligible for upkeep");
@@ -130,6 +149,7 @@ contract PharmaEscrowEngine {
         if (actionType == 1) {
             require(order.coldChainCompliant && order.custodyAccepted, "Upkeep conditions not met for release");
             order.status = EscrowStatus.RELEASED;
+            _removeActiveOrder(orderId);
             uint256 payout = order.amountWei;
             order.amountWei = 0;
             (bool success, ) = payable(order.seller).call{value: payout}("");
@@ -139,6 +159,7 @@ contract PharmaEscrowEngine {
         } else if (actionType == 2) {
             require(block.timestamp > order.timeoutTimestamp, "Timeout SLA not breached");
             order.status = EscrowStatus.REFUNDED;
+            _removeActiveOrder(orderId);
             uint256 refundAmount = order.amountWei;
             order.amountWei = 0;
             (bool success, ) = payable(order.buyer).call{value: refundAmount}("");
@@ -152,6 +173,10 @@ contract PharmaEscrowEngine {
 
     function getEscrow(bytes32 orderId) external view returns (EscrowOrder memory) {
         return escrows[orderId];
+    }
+
+    function getActiveOrdersCount() external view returns (uint256) {
+        return activeOrderIds.length;
     }
 }
 
