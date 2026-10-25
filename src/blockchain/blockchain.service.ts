@@ -12,12 +12,38 @@ export class BlockchainService implements OnModuleInit {
     private contract: ethers.Contract | null = null;
     private contractAddress: string = process.env.BLOCKCHAIN_CONTRACT_ADDRESS || '';
 
-    
+    private digitalTwinContract: ethers.Contract | null = null;
+    private escrowContract: ethers.Contract | null = null;
+    private stakingContract: ethers.Contract | null = null;
+    private timelockContract: ethers.Contract | null = null;
+
     private readonly localAttestations: Map<string, AttestationAnchor> = new Map();
     private readonly drugHistoryIndex: Map<string, string[]> = new Map();
 
     async onModuleInit() {
         await this.initializeBlockchain();
+    }
+
+    private loadContract(
+        contractName: string,
+        address: string,
+        abiFileName: string,
+    ): ethers.Contract | null {
+        if (!address || !this.wallet) {
+            return null;
+        }
+        try {
+            const artifactPath = path.resolve(__dirname, 'artifacts', `${abiFileName}.json`);
+            if (fs.existsSync(artifactPath)) {
+                const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+                const contract = new ethers.Contract(address, artifact.abi, this.wallet);
+                this.logger.log(`Connected to ${contractName} at ${address}`);
+                return contract;
+            }
+        } catch (error: any) {
+            this.logger.warn(`Failed to initialize ${contractName}: ${error.message}`);
+        }
+        return null;
     }
 
     private async initializeBlockchain() {
@@ -31,18 +57,31 @@ export class BlockchainService implements OnModuleInit {
                 this.wallet = new ethers.Wallet(privateKey, this.provider);
             }
 
-            const artifactPath = path.resolve(__dirname, 'artifacts', 'PharmaTraceAttestation.json');
-            if (fs.existsSync(artifactPath)) {
-                const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+            let deployedRegistry: Record<string, string> = {};
+            const registryPath = path.resolve(__dirname, 'artifacts', 'deployed-addresses.json');
+            if (fs.existsSync(registryPath)) {
+                try {
+                    const parsed = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+                    deployedRegistry = parsed.contracts || {};
+                } catch {}
+            }
 
-                if (this.contractAddress && this.wallet) {
-                    this.contract = new ethers.Contract(this.contractAddress, artifact.abi, this.wallet);
-                    this.logger.log(` Connected to Blockchain Attestation Contract at ${this.contractAddress}`);
-                } else {
-                    this.logger.warn(
-                        ' Blockchain contract address or private key not specified. Operating in hybrid / self-anchoring mode.'
-                    );
-                }
+            const attestationAddr = process.env.BLOCKCHAIN_CONTRACT_ADDRESS || deployedRegistry['PharmaTraceAttestation'] || this.contractAddress;
+            const timelockAddr = process.env.TIMELOCK_CONTRACT_ADDRESS || deployedRegistry['PharmaGovernanceTimelock'] || '';
+            const stakingAddr = process.env.CARRIER_STAKING_CONTRACT_ADDRESS || deployedRegistry['CarrierStakingEscrow'] || '';
+            const digitalTwinAddr = process.env.DIGITAL_TWIN_CONTRACT_ADDRESS || deployedRegistry['PharmaDigitalTwin'] || '';
+            const escrowAddr = process.env.ESCROW_ENGINE_CONTRACT_ADDRESS || deployedRegistry['PharmaEscrowEngine'] || '';
+
+            this.contract = this.loadContract('PharmaTraceAttestation', attestationAddr, 'PharmaTraceAttestation');
+            this.digitalTwinContract = this.loadContract('PharmaDigitalTwin', digitalTwinAddr, 'PharmaDigitalTwin');
+            this.escrowContract = this.loadContract('PharmaEscrowEngine', escrowAddr, 'PharmaEscrowEngine');
+            this.carrierStakingContract = this.loadContract('CarrierStakingEscrow', stakingAddr, 'CarrierStakingEscrow');
+            this.governanceTimelockContract = this.loadContract('PharmaGovernanceTimelock', timelockAddr, 'PharmaGovernanceTimelock');
+
+            if (!this.contract) {
+                this.logger.warn(
+                    'Blockchain contract address or private key not specified. Operating in hybrid / self-anchoring mode.'
+                );
             }
         } catch (error: any) {
             this.logger.warn(`Blockchain provider connection skipped: ${error.message}`);
@@ -229,5 +268,33 @@ export class BlockchainService implements OnModuleInit {
         }
 
         return false;
+    }
+
+    getDigitalTwinContract(): ethers.Contract | null {
+        return this.digitalTwinContract;
+    }
+
+    getEscrowContract(): ethers.Contract | null {
+        return this.escrowContract;
+    }
+
+    getCarrierStakingContract(): ethers.Contract | null {
+        return this.carrierStakingContract;
+    }
+
+    getGovernanceTimelockContract(): ethers.Contract | null {
+        return this.governanceTimelockContract;
+    }
+
+    getAttestationContract(): ethers.Contract | null {
+        return this.contract;
+    }
+
+    getProvider(): ethers.JsonRpcProvider | null {
+        return this.provider;
+    }
+
+    getWallet(): ethers.Wallet | null {
+        return this.wallet;
     }
 }
