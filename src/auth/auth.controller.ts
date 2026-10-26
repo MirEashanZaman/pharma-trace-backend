@@ -13,6 +13,8 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, Web3LoginDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { RolesGuard } from './roles.guard';
+import { Roles } from './roles.decorator';
 import { UserRole } from './entities/user.entity';
 
 @Controller('auth')
@@ -45,7 +47,8 @@ export class AuthController {
         return this.authService.getProfile(req.user.userId);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN, UserRole.REGULATOR)
     @Get('users')
     getUsers(
         @Query('role') role?: UserRole,
@@ -54,7 +57,8 @@ export class AuthController {
         return this.authService.getUsers(role, limit ? Number(limit) : undefined);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN, UserRole.REGULATOR)
     @Get('users/:id')
     getUserById(@Param('id') id: string) {
         return this.authService.getUserById(Number(id));
@@ -69,7 +73,8 @@ export class AuthController {
         return this.authService.updateProfile(req.user.userId, body);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
     @Delete('users/:id')
     deleteUser(@Param('id') id: string) {
         return this.authService.deleteUser(Number(id));
