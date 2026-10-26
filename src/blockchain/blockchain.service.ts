@@ -14,8 +14,8 @@ export class BlockchainService implements OnModuleInit {
 
     private digitalTwinContract: ethers.Contract | null = null;
     private escrowContract: ethers.Contract | null = null;
-    private stakingContract: ethers.Contract | null = null;
-    private timelockContract: ethers.Contract | null = null;
+    private carrierStakingContract: ethers.Contract | null = null;
+    private governanceTimelockContract: ethers.Contract | null = null;
 
     private readonly localAttestations: Map<string, AttestationAnchor> = new Map();
     private readonly drugHistoryIndex: Map<string, string[]> = new Map();
