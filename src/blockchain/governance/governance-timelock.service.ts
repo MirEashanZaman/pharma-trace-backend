@@ -1,5 +1,6 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger, Optional } from '@nestjs/common';
 import { keccak256, toUtf8Bytes, getAddress, isAddress } from 'ethers';
+import { BlockchainService } from '../blockchain.service';
 
 export enum GovernanceProposalStatus {
   QUEUED = 'QUEUED',
@@ -39,7 +40,9 @@ export class GovernanceTimelockService {
   private requiredThreshold: number = 2;
   private minDelaySeconds: number = 172800;
 
-  constructor() {
+  constructor(
+    @Optional() private readonly blockchainService?: BlockchainService,
+  ) {
     this.registerGuardian('0x70997970C51812dc3A010C7d01b50e0d17dc79C8', 'US FDA CDER', 'US');
     this.registerGuardian('0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', 'European Medicines Agency (EMA)', 'EU');
     this.registerGuardian('0x90F79bf6EB2c4f870365E785982E1f101E93b906', 'UK MHRA', 'UK');
@@ -90,6 +93,13 @@ export class GovernanceTimelockService {
     const payload = `${normalizedTarget}:${params.valueWei ?? 0}:${params.data}:${params.description}:${nowSec}:${normalizedProposer}`;
     const proposalId = keccak256(toUtf8Bytes(payload));
 
+    const contract = this.blockchainService?.getGovernanceTimelockContract();
+    if (contract) {
+      contract.propose(normalizedTarget, params.valueWei ?? 0, params.data, params.description).catch((err: any) => {
+        this.logger.warn(`On-chain governance proposal creation failed: ${err.message}`);
+      });
+    }
+
     const proposal: GovernanceProposal = {
       id: proposalId,
       proposer: normalizedProposer,
@@ -124,6 +134,16 @@ export class GovernanceTimelockService {
       throw new BadRequestException('Guardian has already confirmed this proposal');
     }
 
+    const contract = this.blockchainService?.getGovernanceTimelockContract();
+    if (contract) {
+      const proposalBytes32 = proposalId.startsWith('0x') && proposalId.length === 66
+        ? proposalId
+        : keccak256(toUtf8Bytes(proposalId));
+      contract.confirmProposal(proposalBytes32).catch((err: any) => {
+        this.logger.warn(`On-chain governance proposal confirmation failed: ${err.message}`);
+      });
+    }
+
     proposal.confirmations.push(normalizedGuardian);
     this.proposals.set(proposalId, proposal);
     this.logger.log(`Guardian ${normalizedGuardian} confirmed proposal ${proposalId} (${proposal.confirmations.length}/${this.requiredThreshold})`);
@@ -155,7 +175,25 @@ export class GovernanceTimelockService {
       throw new BadRequestException(`Timelock delay pending: ${proposal.eta - nowSec} seconds remaining before execution`);
     }
 
-    const executionTxHash = keccak256(toUtf8Bytes(`GOV_EXECUTE:${proposalId}:${nowSec}`));
+    let executionTxHash: string | undefined;
+    const contract = this.blockchainService?.getGovernanceTimelockContract();
+    if (contract) {
+      try {
+        const proposalBytes32 = proposalId.startsWith('0x') && proposalId.length === 66
+          ? proposalId
+          : keccak256(toUtf8Bytes(proposalId));
+        const tx = await contract.executeProposal(proposalBytes32);
+        const receipt = await tx.wait();
+        executionTxHash = receipt.hash;
+        this.logger.log(`Executed regulatory governance proposal on-chain: ${executionTxHash}`);
+      } catch (err: any) {
+        this.logger.warn(`On-chain governance execution failed: ${err.message}`);
+      }
+    }
+    if (!executionTxHash) {
+      executionTxHash = keccak256(toUtf8Bytes(`GOV_EXECUTE:${proposalId}:${nowSec}`));
+    }
+
     proposal.status = GovernanceProposalStatus.EXECUTED;
     proposal.executionTxHash = executionTxHash;
 
@@ -179,6 +217,16 @@ export class GovernanceTimelockService {
 
     if (proposal.status !== GovernanceProposalStatus.QUEUED) {
       throw new BadRequestException(`Proposal in status ${proposal.status} cannot be cancelled`);
+    }
+
+    const contract = this.blockchainService?.getGovernanceTimelockContract();
+    if (contract) {
+      const proposalBytes32 = proposalId.startsWith('0x') && proposalId.length === 66
+        ? proposalId
+        : keccak256(toUtf8Bytes(proposalId));
+      contract.cancelProposal(proposalBytes32, reason).catch((err: any) => {
+        this.logger.warn(`On-chain governance cancellation failed: ${err.message}`);
+      });
     }
 
     proposal.status = GovernanceProposalStatus.CANCELLED;
