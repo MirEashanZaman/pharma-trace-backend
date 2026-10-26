@@ -91,6 +91,9 @@ contract PharmaEscrowEngine is ReentrancyGuard {
         require(order.amountWei > 0, "Escrow not found");
         require(order.status == EscrowStatus.FUNDED, "Escrow not in funded state");
         require(msg.sender == owner || msg.sender == order.buyer || msg.sender == order.seller, "Unauthorized to record compliance");
+        if (msg.sender == order.seller) {
+            require(!custodyAccepted || order.custodyAccepted, "Seller cannot self-confirm custody acceptance");
+        }
 
         order.coldChainCompliant = coldChainCompliant;
         order.custodyAccepted = custodyAccepted;
@@ -113,6 +116,10 @@ contract PharmaEscrowEngine is ReentrancyGuard {
         require(order.amountWei > 0, "Escrow not found");
         require(order.status == EscrowStatus.FUNDED, "Escrow not in funded state");
         require(msg.sender == owner || msg.sender == order.buyer, "Unauthorized to trigger refund");
+        require(bytes(breachReason).length > 0, "Breach reason required");
+        if (msg.sender == order.buyer) {
+            require(!order.custodyAccepted, "Cannot trigger refund after custody acceptance");
+        }
 
         order.status = EscrowStatus.REFUNDED;
         _removeActiveOrder(orderId);
