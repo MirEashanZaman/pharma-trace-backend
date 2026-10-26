@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger, Optional } from '@nestjs/common';
 import { isAddress, getAddress, keccak256, toUtf8Bytes } from 'ethers';
 import {
   SensorConsensusEngine,
@@ -12,6 +12,7 @@ import {
   LockBondDto,
   UnstakeDto,
 } from './carrier-staking.types';
+import { BlockchainService } from '../blockchain.service';
 
 @Injectable()
 export class CarrierStakingService {
@@ -22,6 +23,7 @@ export class CarrierStakingService {
 
   constructor(
     private readonly consensusEngine: SensorConsensusEngine = new SensorConsensusEngine(),
+    @Optional() private readonly blockchainService?: BlockchainService,
   ) {}
 
   depositStake(dto: DepositStakeDto): CarrierStakeAccount {
@@ -34,6 +36,14 @@ export class CarrierStakingService {
 
     const carrier = getAddress(dto.carrierAddress);
     const symbol = dto.tokenSymbol || 'USDC';
+
+    const contract = this.blockchainService?.getCarrierStakingContract();
+    if (contract) {
+      contract.stakeCollateral(dto.amountTokens).catch((err: any) => {
+        this.logger.warn(`On-chain stake collateral failed: ${err.message}`);
+      });
+    }
+
     const existing = this.accounts.get(carrier) || {
       carrierAddress: carrier,
       totalStaked: 0,
@@ -98,6 +108,16 @@ export class CarrierStakingService {
     account.lockedCollateral += dto.bondAmount;
     account.availableCollateral = account.totalStaked - account.lockedCollateral;
     account.lastUpdated = Date.now();
+
+    const contract = this.blockchainService?.getCarrierStakingContract();
+    if (contract) {
+      const shipmentBytes32 = dto.shipmentId.startsWith('0x') && dto.shipmentId.length === 66
+        ? dto.shipmentId
+        : keccak256(toUtf8Bytes(dto.shipmentId));
+      contract.lockShipmentBond(shipmentBytes32, carrier, manufacturer, dto.bondAmount).catch((err: any) => {
+        this.logger.warn(`On-chain lock shipment bond failed: ${err.message}`);
+      });
+    }
 
     const bond: ShipmentBond = {
       shipmentId: dto.shipmentId,
@@ -181,6 +201,16 @@ export class CarrierStakingService {
       carrier.availableCollateral = carrier.totalStaked - carrier.lockedCollateral;
       carrier.lastUpdated = Date.now();
 
+      const contract = this.blockchainService?.getCarrierStakingContract();
+      if (contract) {
+        const shipmentBytes32 = shipmentId.startsWith('0x') && shipmentId.length === 66
+          ? shipmentId
+          : keccak256(toUtf8Bytes(shipmentId));
+        contract.releaseShipmentBond(shipmentBytes32).catch((err: any) => {
+          this.logger.warn(`On-chain release bond failed: ${err.message}`);
+        });
+      }
+
       bond.status = 'RELEASED';
       bond.slashedAmount = 0;
       bond.resolvedAt = Date.now();
@@ -215,6 +245,16 @@ export class CarrierStakingService {
     this.indemnityLedger.set(bond.manufacturerAddress, currentIndemnity + slashedAmount);
 
     const reason = `Autonomous bond slashing: multi-sensor consensus rejected cold-chain telemetry. Excursions: ${consensusReport.excursionCheckpoints}`;
+
+    const contract = this.blockchainService?.getCarrierStakingContract();
+    if (contract) {
+      const shipmentBytes32 = shipmentId.startsWith('0x') && shipmentId.length === 66
+        ? shipmentId
+        : keccak256(toUtf8Bytes(shipmentId));
+      contract.slashShipmentBond(shipmentBytes32, slashPct, reason, reportHash).catch((err: any) => {
+        this.logger.warn(`On-chain slash bond failed: ${err.message}`);
+      });
+    }
 
     bond.status = 'SLASHED';
     bond.slashedAmount = slashedAmount;
@@ -256,6 +296,13 @@ export class CarrierStakingService {
       carrier.isAccredited = false;
     }
     carrier.lastUpdated = Date.now();
+
+    const contract = this.blockchainService?.getCarrierStakingContract();
+    if (contract) {
+      contract.unstakeCollateral(dto.amountTokens).catch((err: any) => {
+        this.logger.warn(`On-chain unstake collateral failed: ${err.message}`);
+      });
+    }
 
     this.logger.log(`Carrier ${carrier.carrierAddress} unstaked ${dto.amountTokens} collateral. Remaining: ${carrier.totalStaked}`);
     return carrier;
