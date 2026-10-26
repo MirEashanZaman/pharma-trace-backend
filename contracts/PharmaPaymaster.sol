@@ -3,8 +3,9 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract PharmaPaymaster is Ownable {
+contract PharmaPaymaster is Ownable, ReentrancyGuard {
     using ECDSA for bytes32;
 
     address public verifyingSigner;
@@ -83,7 +84,8 @@ contract PharmaPaymaster is Ownable {
         emit FundsDeposited(msg.sender, msg.value);
     }
 
-    function withdraw(address payable to, uint256 amount) external onlyOwner {
+    function withdraw(address payable to, uint256 amount) external onlyOwner nonReentrant {
+        require(to != address(0), "Invalid withdrawal address");
         require(address(this).balance >= amount, "Insufficient contract balance");
         (bool success, ) = to.call{value: amount}("");
         require(success, "Withdraw transfer failed");
