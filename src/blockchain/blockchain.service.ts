@@ -16,6 +16,8 @@ export class BlockchainService implements OnModuleInit {
     private escrowContract: ethers.Contract | null = null;
     private carrierStakingContract: ethers.Contract | null = null;
     private governanceTimelockContract: ethers.Contract | null = null;
+    private paymasterContract: ethers.Contract | null = null;
+    private zkVerifierContract: ethers.Contract | null = null;
 
     private readonly localAttestations: Map<string, AttestationAnchor> = new Map();
     private readonly drugHistoryIndex: Map<string, string[]> = new Map();
@@ -71,12 +73,16 @@ export class BlockchainService implements OnModuleInit {
             const stakingAddr = process.env.CARRIER_STAKING_CONTRACT_ADDRESS || deployedRegistry['CarrierStakingEscrow'] || '';
             const digitalTwinAddr = process.env.DIGITAL_TWIN_CONTRACT_ADDRESS || deployedRegistry['PharmaDigitalTwin'] || '';
             const escrowAddr = process.env.ESCROW_ENGINE_CONTRACT_ADDRESS || deployedRegistry['PharmaEscrowEngine'] || '';
+            const paymasterAddr = process.env.PAYMASTER_CONTRACT_ADDRESS || deployedRegistry['PharmaPaymaster'] || '';
+            const zkVerifierAddr = process.env.ZK_VERIFIER_CONTRACT_ADDRESS || deployedRegistry['ZkColdChainVerifier'] || '';
 
             this.contract = this.loadContract('PharmaTraceAttestation', attestationAddr, 'PharmaTraceAttestation');
             this.digitalTwinContract = this.loadContract('PharmaDigitalTwin', digitalTwinAddr, 'PharmaDigitalTwin');
             this.escrowContract = this.loadContract('PharmaEscrowEngine', escrowAddr, 'PharmaEscrowEngine');
             this.carrierStakingContract = this.loadContract('CarrierStakingEscrow', stakingAddr, 'CarrierStakingEscrow');
             this.governanceTimelockContract = this.loadContract('PharmaGovernanceTimelock', timelockAddr, 'PharmaGovernanceTimelock');
+            this.paymasterContract = this.loadContract('PharmaPaymaster', paymasterAddr, 'PharmaPaymaster');
+            this.zkVerifierContract = this.loadContract('ZkColdChainVerifier', zkVerifierAddr, 'ZkColdChainVerifier');
 
             if (!this.contract) {
                 this.logger.warn(
@@ -284,6 +290,33 @@ export class BlockchainService implements OnModuleInit {
 
     getGovernanceTimelockContract(): ethers.Contract | null {
         return this.governanceTimelockContract;
+    }
+
+    getPaymasterContract(): ethers.Contract | null {
+        return this.paymasterContract;
+    }
+
+    getZkVerifierContract(): ethers.Contract | null {
+        return this.zkVerifierContract;
+    }
+
+    async verifyZkProofOnChain(
+        a: [string, string],
+        b: [[string, string], [string, string]],
+        c: [string, string],
+        batchHash: string,
+        minTemp: number,
+        maxTemp: number,
+    ): Promise<boolean> {
+        if (this.zkVerifierContract) {
+            try {
+                const bytes32Batch = this.formatBytes32(batchHash);
+                return await this.zkVerifierContract.verifyColdChainIntegrity(a, b, c, bytes32Batch, minTemp, maxTemp);
+            } catch (err: any) {
+                this.logger.warn(`On-chain ZK cold-chain verification call failed: ${err.message}`);
+            }
+        }
+        return false;
     }
 
     getAttestationContract(): ethers.Contract | null {
