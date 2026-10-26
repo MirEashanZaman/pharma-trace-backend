@@ -55,6 +55,7 @@ contract PharmaDigitalTwin {
         string calldata ipfsDossierCid
     ) external returns (uint256) {
         require(msg.sender == owner || roles[MANUFACTURER_ROLE][msg.sender], "Unauthorized to mint digital twin");
+        require(to != address(0), "Cannot mint digital twin to zero address");
         require(serialToTokenId[serialNumber] == 0, "Serial twin already exists");
 
         uint256 tokenId = uint256(keccak256(abi.encode(gtin, batchNumber, serialNumber)));
@@ -82,6 +83,8 @@ contract PharmaDigitalTwin {
         uint256 tokenId
     ) external {
         require(msg.sender == from || msg.sender == owner, "Caller not authorized to transfer");
+        require(to != address(0), "Cannot transfer custody to zero address");
+        require(from != to, "Cannot transfer custody to self");
         require(balances[tokenId][from] >= 1, "Insufficient balance to transfer");
         require(itemDetails[tokenId].status != ItemStatus.BURNED, "Cannot transfer burned item");
 
@@ -98,6 +101,7 @@ contract PharmaDigitalTwin {
         address dispenser
     ) external returns (bool) {
         require(msg.sender == owner || roles[DISPENSER_ROLE][msg.sender], "Caller not authorized to dispense");
+        require(dispenser != address(0), "Invalid dispenser address");
         uint256 tokenId = serialToTokenId[serialNumber];
         require(tokenId != 0, "Item does not exist");
         require(balances[tokenId][dispenser] >= 1, "Dispenser does not hold item");
