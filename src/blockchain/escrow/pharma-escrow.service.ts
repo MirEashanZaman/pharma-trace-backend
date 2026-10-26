@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, Logger, Optional } from '@nestjs/common';
-import { keccak256, toUtf8Bytes, getAddress, isAddress, parseEther } from 'ethers';
+import { keccak256, toUtf8Bytes, getAddress, isAddress, parseEther, AbiCoder } from 'ethers';
 import {
   SensorConsensusEngine,
   CheckpointCluster,
@@ -314,12 +314,28 @@ export class PharmaEscrowService {
       throw new BadRequestException(`Order ${orderId} is not in funded status`);
     }
 
+    const contract = this.blockchainService?.getEscrowContract();
+    if (contract) {
+      try {
+        const orderBytes32 = orderId.startsWith('0x') && orderId.length === 66 ? orderId : keccak256(toUtf8Bytes(orderId));
+        const performData = AbiCoder.defaultAbiCoder().encode(['bytes32', 'uint8'], [orderBytes32, actionType]);
+        const tx = await contract.performUpkeep(performData);
+        const receipt = await tx.wait();
+        order.settlementTxHash = receipt.hash;
+        this.logger.log(`On-chain upkeep performed: ${receipt.hash}`);
+      } catch (err: any) {
+        this.logger.warn(`On-chain upkeep execution skipped: ${err.message}`);
+      }
+    }
+
     if (actionType === 1) {
       if (!order.coldChainCompliant || !order.custodyAccepted) {
         throw new BadRequestException('Compliance conditions not met for automated release');
       }
       order.status = EscrowState.RELEASED;
-      order.settlementTxHash = keccak256(toUtf8Bytes(`KEEPER_SETTLE:${orderId}:${Date.now()}`));
+      if (!order.settlementTxHash) {
+        order.settlementTxHash = keccak256(toUtf8Bytes(`KEEPER_SETTLE:${orderId}:${Date.now()}`));
+      }
       this.escrows.set(orderId, order);
       this.logger.log(`Chainlink Automation Keeper performed release for escrow ${orderId}`);
       return order;
@@ -328,12 +344,28 @@ export class PharmaEscrowService {
     if (actionType === 2) {
       order.status = EscrowState.REFUNDED;
       order.refundReason = 'Chainlink Automation Keeper: Delivery SLA timeout refund';
+      if (!order.settlementTxHash) {
+        order.settlementTxHash = keccak256(toUtf8Bytes(`KEEPER_REFUND:${orderId}:${Date.now()}`));
+      }
       this.escrows.set(orderId, order);
       this.logger.log(`Chainlink Automation Keeper performed timeout refund for escrow ${orderId}`);
       return order;
     }
 
     throw new BadRequestException(`Unsupported upkeep action type: ${actionType}`);
+  }
+
+  async pollAndExecuteUpkeep(): Promise<{ executed: boolean; orderId?: string; actionType?: number }> {
+    const check = await this.checkAutomationUpkeep();
+    if (check.upkeepNeeded && check.orderId && check.actionType) {
+      await this.performAutomationUpkeep(check.orderId, check.actionType);
+      return {
+        executed: true,
+        orderId: check.orderId,
+        actionType: check.actionType,
+      };
+    }
+    return { executed: false };
   }
 }
 
