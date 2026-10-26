@@ -35,6 +35,7 @@ contract CarrierStakingEscrow is ReentrancyGuard {
     mapping(address => CarrierAccount) public carriers;
     mapping(bytes32 => ShipmentBond) public bonds;
     bytes32[] public activeBondIds;
+    mapping(bytes32 => uint256) private activeBondIdIndex;
 
     event CarrierStaked(address indexed carrier, uint256 amount, uint256 newTotalStake);
     event CarrierUnstaked(address indexed carrier, uint256 amount, uint256 remainingStake);
@@ -50,6 +51,18 @@ contract CarrierStakingEscrow is ReentrancyGuard {
     constructor(address _stakingToken) {
         owner = msg.sender;
         stakingToken = IERC20(_stakingToken);
+    }
+
+    function _removeActiveBond(bytes32 shipmentId) internal {
+        uint256 index = activeBondIdIndex[shipmentId];
+        uint256 lastIndex = activeBondIds.length - 1;
+        if (index != lastIndex) {
+            bytes32 lastBondId = activeBondIds[lastIndex];
+            activeBondIds[index] = lastBondId;
+            activeBondIdIndex[lastBondId] = index;
+        }
+        activeBondIds.pop();
+        delete activeBondIdIndex[shipmentId];
     }
 
     function stakeCollateral(uint256 amount) external nonReentrant {
@@ -101,6 +114,7 @@ contract CarrierStakingEscrow is ReentrancyGuard {
             resolutionReason: ""
         });
 
+        activeBondIdIndex[shipmentId] = activeBondIds.length;
         activeBondIds.push(shipmentId);
         emit BondLocked(shipmentId, carrier, manufacturer, bondAmount);
     }
@@ -114,6 +128,8 @@ contract CarrierStakingEscrow is ReentrancyGuard {
         bond.status = BondStatus.RELEASED;
         bond.resolvedAt = block.timestamp;
         bond.resolutionReason = "Multi-sensor consensus verified compliant cold-chain handover";
+
+        _removeActiveBond(shipmentId);
 
         emit BondReleased(shipmentId, bond.carrier, bond.bondAmount);
     }
@@ -140,6 +156,8 @@ contract CarrierStakingEscrow is ReentrancyGuard {
         bond.resolvedAt = block.timestamp;
         bond.resolutionReason = excursionReason;
 
+        _removeActiveBond(shipmentId);
+
         stakingToken.safeTransfer(bond.manufacturer, slashedAmount);
 
         emit BondSlashed(shipmentId, bond.carrier, bond.manufacturer, slashedAmount, excursionReason, consensusReportHash);
@@ -151,5 +169,9 @@ contract CarrierStakingEscrow is ReentrancyGuard {
 
     function getShipmentBond(bytes32 shipmentId) external view returns (ShipmentBond memory) {
         return bonds[shipmentId];
+    }
+
+    function getActiveBondsCount() external view returns (uint256) {
+        return activeBondIds.length;
     }
 }
