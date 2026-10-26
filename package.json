@@ -17,6 +17,7 @@
     "deploy:contract": "node scripts/deploy.js",
     "seed": "ts-node scripts/seed.ts",
     "test": "jest",
+    "test:contracts": "hardhat test",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
