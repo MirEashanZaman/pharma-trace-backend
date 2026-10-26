@@ -74,6 +74,23 @@ async function main() {
     const attestationAddress = await deployContract('PharmaTraceAttestation', deployer, []);
     console.log(`PharmaTraceAttestation deployed: ${attestationAddress}`);
 
+    const paymasterAddress = await deployContract('PharmaPaymaster', deployer, [deployerAddress]);
+    console.log(`PharmaPaymaster deployed: ${paymasterAddress}`);
+
+    try {
+        const fundTx = await deployer.sendTransaction({
+            to: paymasterAddress,
+            value: ethers.parseEther('2.0')
+        });
+        await fundTx.wait();
+        console.log(`PharmaPaymaster funded with 2.0 ETH gas sponsorship deposit`);
+    } catch (fundErr) {
+        console.log(`PharmaPaymaster fund deposit skipped: ${fundErr.message}`);
+    }
+
+    const zkVerifierAddress = await deployContract('ZkColdChainVerifier', deployer, []);
+    console.log(`ZkColdChainVerifier deployed: ${zkVerifierAddress}`);
+
     const deployedAddresses = {
         deployer: deployerAddress,
         deployedAt: new Date().toISOString(),
@@ -82,7 +99,9 @@ async function main() {
             CarrierStakingEscrow: carrierStakingAddress,
             PharmaDigitalTwin: digitalTwinAddress,
             PharmaEscrowEngine: escrowEngineAddress,
-            PharmaTraceAttestation: attestationAddress
+            PharmaTraceAttestation: attestationAddress,
+            PharmaPaymaster: paymasterAddress,
+            ZkColdChainVerifier: zkVerifierAddress
         }
     };
 
@@ -102,6 +121,8 @@ async function main() {
     updateEnv('CARRIER_STAKING_CONTRACT_ADDRESS', carrierStakingAddress);
     updateEnv('DIGITAL_TWIN_CONTRACT_ADDRESS', digitalTwinAddress);
     updateEnv('ESCROW_ENGINE_CONTRACT_ADDRESS', escrowEngineAddress);
+    updateEnv('PAYMASTER_CONTRACT_ADDRESS', paymasterAddress);
+    updateEnv('ZK_VERIFIER_CONTRACT_ADDRESS', zkVerifierAddress);
 
     console.log('Updated .env with all deployed contract addresses successfully');
 }
