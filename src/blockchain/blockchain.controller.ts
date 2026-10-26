@@ -15,6 +15,7 @@ import { BlockchainService } from './blockchain.service';
 import { IpfsService } from './ipfs/ipfs.service';
 import { ZkProofEngine } from './zk/zk-proof.engine';
 import { PaymasterService } from './account-abstraction/paymaster.service';
+import { BundlerService } from './account-abstraction/bundler.service';
 import { SoulboundAccreditationService } from './sbt/soulbound-accreditation.service';
 import { DigitalTwinService } from './digital-twin/digital-twin.service';
 import { PharmaEscrowService } from './escrow/pharma-escrow.service';
@@ -74,6 +75,7 @@ export class BlockchainController {
         private readonly escrowService: PharmaEscrowService,
         private readonly didResolverService: DidResolverService,
         private readonly epcisJsonLdService: EpcisJsonLdService,
+        private readonly bundlerService: BundlerService,
     ) {}
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -313,6 +315,37 @@ export class BlockchainController {
     @Post('epcis/canonicalize')
     canonicalizeDocument(@Body() doc: any) {
         return this.epcisJsonLdService.canonicalizeAndHash(doc);
+    }
+
+    @Post('aa/estimate-gas')
+    estimateUserOpGas(@Body() userOp: any) {
+        return this.bundlerService.estimateUserOpGas(userOp);
+    }
+
+    @Post('aa/sponsor')
+    async sponsorUserOpForBundler(@Body() body: { userOp: any; actionName: string }) {
+        return this.paymasterService.sponsorUserOperation(body.userOp, body.actionName);
+    }
+
+    @Post('aa/send-userop')
+    sendUserOp(@Body() userOp: any) {
+        return this.bundlerService.sendUserOperation(userOp);
+    }
+
+    @Post('aa/bundle-and-execute')
+    async bundleAndExecute(@Body() body?: { maxBatchSize?: number; beneficiary?: string }) {
+        const bundle = this.bundlerService.createBundle(body?.maxBatchSize || 10, body?.beneficiary);
+        return this.bundlerService.executeBundle(bundle);
+    }
+
+    @Get('aa/receipt/:hash')
+    getUserOpReceipt(@Param('hash') hash: string) {
+        return this.bundlerService.getUserOpReceipt(hash);
+    }
+
+    @Get('aa/mempool')
+    getMempoolStatus() {
+        return this.bundlerService.getMempoolStatus();
     }
 }
 
