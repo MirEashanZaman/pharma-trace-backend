@@ -4,6 +4,7 @@ import { BlockchainController } from './blockchain.controller';
 import { IpfsService } from './ipfs/ipfs.service';
 import { ZkProofEngine } from './zk/zk-proof.engine';
 import { PaymasterService } from './account-abstraction/paymaster.service';
+import { BundlerService } from './account-abstraction/bundler.service';
 import { SoulboundAccreditationService } from './sbt/soulbound-accreditation.service';
 import { DigitalTwinService } from './digital-twin/digital-twin.service';
 import { PharmaEscrowService } from './escrow/pharma-escrow.service';
@@ -29,6 +30,7 @@ describe('BlockchainModule Integration', () => {
                 DidResolverService,
                 EpcisJsonLdService,
                 SensorConsensusEngine,
+                BundlerService,
             ],
         }).compile();
 
