@@ -1,0 +1,412 @@
+{
+  "contractName": "PharmaPaymaster",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_verifyingSigner",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "ECDSAInvalidSignature",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "length",
+          "type": "uint256"
+        }
+      ],
+      "name": "ECDSAInvalidSignatureLength",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "s",
+          "type": "bytes32"
+        }
+      ],
+      "name": "ECDSAInvalidSignatureS",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "FundsDeposited",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "FundsWithdrawn",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "validUntil",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "validAfter",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "userOpHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "GasSponsored",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousSigner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newSigner",
+          "type": "address"
+        }
+      ],
+      "name": "SignerUpdated",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "VALID_TIMESTAMP_OFFSET",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "name": "executedUserOpHashes",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "paymasterAndData",
+          "type": "bytes"
+        }
+      ],
+      "name": "parsePaymasterAndData",
+      "outputs": [
+        {
+          "internalType": "uint48",
+          "name": "validUntil",
+          "type": "uint48"
+        },
+        {
+          "internalType": "uint48",
+          "name": "validAfter",
+          "type": "uint48"
+        },
+        {
+          "internalType": "bytes",
+          "name": "signature",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_newSigner",
+          "type": "address"
+        }
+      ],
+      "name": "setVerifyingSigner",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "userOpHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint48",
+          "name": "validUntil",
+          "type": "uint48"
+        },
+        {
+          "internalType": "uint48",
+          "name": "validAfter",
+          "type": "uint48"
+        },
+        {
+          "internalType": "bytes",
+          "name": "signature",
+          "type": "bytes"
+        }
+      ],
+      "name": "sponsorTransaction",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "hash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "toEthSignedMessageHash",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "userOpHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint48",
+          "name": "validUntil",
+          "type": "uint48"
+        },
+        {
+          "internalType": "uint48",
+          "name": "validAfter",
+          "type": "uint48"
+        },
+        {
+          "internalType": "bytes",
+          "name": "signature",
+          "type": "bytes"
+        }
+      ],
+      "name": "validateSponsorship",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "verifyingSigner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address payable",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "withdraw",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "stateMutability": "payable",
+      "type": "receive"
+    }
+  ],
+  "bytecode": "608060405234801561000f575f80fd5b50604051610e70380380610e7083398101604081905261002e91610128565b338061005457604051631e4fbdf760e01b81525f60048201526024015b60405180910390fd5b61005d816100d9565b506001600160a01b0381166100b45760405162461bcd60e51b815260206004820152601860248201527f496e76616c696420766572696679696e67207369676e65720000000000000000604482015260640161004b565b600180546001600160a01b0319166001600160a01b0392909216919091179055610155565b5f80546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b5f60208284031215610138575f80fd5b81516001600160a01b038116811461014e575f80fd5b9392505050565b610d0e806101625f395ff3fe6080604052600436106100a8575f3560e01c806394d4ad601161006257806394d4ad60146101e0578063ac2db91a1461020f578063d0a2ff4a14610224578063f2fde38b14610243578063f3fef3a314610262578063f5cba98c14610281575f80fd5b806322f48d94146100e857806323357a171461011c57806323d9ac9b1461014a578063715018a6146101815780638da5cb5b14610197578063918a15cf146101b3575f80fd5b366100e45760405134815233907f543ba50a5eec5e6178218e364b1d0f396157b3c8fa278522c2cb7fd99407d4749060200160405180910390a2005b5f80fd5b3480156100f3575f80fd5b50610107610102366004610afb565b6102a0565b60405190151581526020015b60405180910390f35b348015610127575f80fd5b50610107610136366004610b77565b60026020525f908152604090205460ff1681565b348015610155575f80fd5b50600154610169906001600160a01b031681565b6040516001600160a01b039091168152602001610113565b34801561018c575f80fd5b506101956103eb565b005b3480156101a2575f80fd5b505f546001600160a01b0316610169565b3480156101be575f80fd5b506101d26101cd366004610b77565b6103fe565b604051908152602001610113565b3480156101eb575f80fd5b506101ff6101fa366004610b8e565b610450565b6040516101139493929190610bcd565b34801561021a575f80fd5b506101d2610e1081565b34801561022f575f80fd5b5061010761023e366004610afb565b6104f5565b34801561024e575f80fd5b5061019561025d366004610c19565b6105f8565b34801561026d575f80fd5b5061019561027c366004610c3b565b610635565b34801561028c575f80fd5b5061019561029b366004610c19565b610774565b5f6102af8787878787876104f5565b6103005760405162461bcd60e51b815260206004820152601e60248201527f496e76616c69642073706f6e736f72736869702076616c69646174696f6e000060448201526064015b60405180910390fd5b5f8681526002602052604090205460ff161561036a5760405162461bcd60e51b815260206004820152602360248201527f557365724f7065726174696f6e206861736820616c72656164792065786563756044820152621d195960ea1b60648201526084016102f7565b5f8681526002602052604090819020805460ff191660011790555186906001600160a01b038916907fb2149824a96d877634c2fe9d109c58e5aaf9fd76e44d492039d91fbcda473285906103d5908990899065ffffffffffff92831681529116602082015260400190565b60405180910390a35060015b9695505050505050565b6103f3610818565b6103fc5f610844565b565b6040517f19457468657265756d205369676e6564204d6573736167653a0a3332000000006020820152603c81018290525f90605c01604051602081830303815290604052805190602001209050919050565b5f80368160348510156104a55760405162461bcd60e51b815260206004820152601f60248201527f496e76616c6964207061796d6173746572416e6444617461206c656e6774680060448201526064016102f7565b6104b3601a60148789610c65565b6104bc91610c8c565b60d01c93506104cf6020601a8789610c65565b6104d891610c8c565b60d01c92506104ea8560208189610c65565b949793965094505050565b5f8365ffffffffffff1642108061051357508465ffffffffffff1642115b1561051f57505f6103e1565b604080516bffffffffffffffffffffffff1930606090811b821660208401526001600160d01b031960d08a811b8216603486015289901b16603a8401528a901b1691810191909152605481018790525f906074016040516020818303038152906040528051906020012090505f610595826103fe565b90505f6105d986868080601f0160208091040260200160405190810160405280939291908181526020018383808284375f9201919091525086939250506108939050565b6001546001600160a01b039081169116149a9950505050505050505050565b610600610818565b6001600160a01b03811661062957604051631e4fbdf760e01b81525f60048201526024016102f7565b61063281610844565b50565b61063d610818565b8047101561068d5760405162461bcd60e51b815260206004820152601d60248201527f496e73756666696369656e7420636f6e74726163742062616c616e636500000060448201526064016102f7565b5f826001600160a01b0316826040515f6040518083038185875af1925050503d805f81146106d6576040519150601f19603f3d011682016040523d82523d5f602084013e6106db565b606091505b505090508061072c5760405162461bcd60e51b815260206004820152601860248201527f5769746864726177207472616e73666572206661696c6564000000000000000060448201526064016102f7565b826001600160a01b03167feaff4b37086828766ad3268786972c0cd24259d4c87a80f9d3963a3c3d999b0d8360405161076791815260200190565b60405180910390a2505050565b61077c610818565b6001600160a01b0381166107c75760405162461bcd60e51b815260206004820152601260248201527124b73b30b634b2103732bb9039b4b3b732b960711b60448201526064016102f7565b600180546001600160a01b038381166001600160a01b0319831681179093556040519116919082907f2d025324f0a785e8c12d0a0d91a9caa49df4ef20ff87e0df7213a1d4f3157beb905f90a35050565b5f546001600160a01b031633146103fc5760405163118cdaa760e01b81523360048201526024016102f7565b5f80546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b5f805f806108a186866108bb565b9250925092506108b18282610904565b5090949350505050565b5f805f83516041036108f2576020840151604085015160608601515f1a6108e4888285856109c0565b9550955095505050506108fd565b505081515f91506002905b9250925092565b5f82600381111561091757610917610cc4565b03610920575050565b600182600381111561093457610934610cc4565b036109525760405163f645eedf60e01b815260040160405180910390fd5b600282600381111561096657610966610cc4565b036109875760405163fce698f760e01b8152600481018290526024016102f7565b600382600381111561099b5761099b610cc4565b036109bc576040516335e2f38360e21b8152600481018290526024016102f7565b5050565b5f80807f7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a08411156109f957505f91506003905082610a7e565b604080515f808252602082018084528a905260ff891692820192909252606081018790526080810186905260019060a0016020604051602081039080840390855afa158015610a4a573d5f803e3d5ffd5b5050604051601f1901519150506001600160a01b038116610a7557505f925060019150829050610a7e565b92505f91508190505b9450945094915050565b6001600160a01b0381168114610632575f80fd5b803565ffffffffffff81168114610ab1575f80fd5b919050565b5f8083601f840112610ac6575f80fd5b50813567ffffffffffffffff811115610add575f80fd5b602083019150836020828501011115610af4575f80fd5b9250929050565b5f805f805f8060a08789031215610b10575f80fd5b8635610b1b81610a88565b955060208701359450610b3060408801610a9c565b9350610b3e60608801610a9c565b9250608087013567ffffffffffffffff811115610b59575f80fd5b610b6589828a01610ab6565b979a9699509497509295939492505050565b5f60208284031215610b87575f80fd5b5035919050565b5f8060208385031215610b9f575f80fd5b823567ffffffffffffffff811115610bb5575f80fd5b610bc185828601610ab6565b90969095509350505050565b65ffffffffffff8516815265ffffffffffff8416602082015260606040820152816060820152818360808301375f818301608090810191909152601f909201601f191601019392505050565b5f60208284031215610c29575f80fd5b8135610c3481610a88565b9392505050565b5f8060408385031215610c4c575f80fd5b8235610c5781610a88565b946020939093013593505050565b5f8085851115610c73575f80fd5b83861115610c7f575f80fd5b5050820193919092039150565b80356001600160d01b03198116906006841015610cbd576001600160d01b0319600685900360031b81901b82161691505b5092915050565b634e487b7160e01b5f52602160045260245ffdfea26469706673582212206b3fd872893b6153e7290ff34d1078d28ed0d7384e3f61dd9bb13bfafd9502b864736f6c634300081a0033"
+}
