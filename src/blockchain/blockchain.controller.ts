@@ -348,11 +348,6 @@ export class BlockchainController {
         return this.bundlerService.getMempoolStatus();
     }
 
-    @Get('escrow/automation/check')
-    checkEscrowAutomation() {
-        return this.escrowService.checkAutomationUpkeep();
-    }
-
     @Post('escrow/automation/poll')
     pollEscrowAutomation() {
         return this.escrowService.pollAndExecuteUpkeep();
