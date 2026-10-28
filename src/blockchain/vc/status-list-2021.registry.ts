@@ -93,10 +93,7 @@ export class StatusList2021Registry {
   }
 
   exportStatusListCredential(issuerDid: string): any {
-    const binaryString = Array.from(this.bits)
-      .map((b) => String.fromCharCode(b))
-      .join('');
-    const encodedList = Buffer.from(binaryString, 'binary').toString('base64');
+    const encodedList = Buffer.from(this.bits.buffer, this.bits.byteOffset, this.bits.byteLength).toString('base64');
 
     return {
       '@context': [
