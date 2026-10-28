@@ -1,5 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { createHash } from 'crypto';
+import { LedgerEntryEntity } from './entities/ledger-entry.entity';
 
 export interface LedgerEntry {
     index: number;
@@ -12,8 +15,37 @@ export interface LedgerEntry {
 }
 
 @Injectable()
-export class LedgerService {
+export class LedgerService implements OnModuleInit {
     private readonly ledger: LedgerEntry[] = [];
+
+    constructor(
+        @InjectRepository(LedgerEntryEntity)
+        private readonly ledgerRepo?: Repository<LedgerEntryEntity>,
+    ) {}
+
+    async onModuleInit() {
+        if (this.ledgerRepo) {
+            try {
+                const stored = await this.ledgerRepo.find({
+                    order: { index: 'ASC' },
+                });
+                if (stored.length > 0) {
+                    this.ledger.length = 0;
+                    for (const item of stored) {
+                        this.ledger.push({
+                            index: item.index,
+                            drugSerialNumber: item.drugSerialNumber,
+                            eventId: item.eventId,
+                            eventHash: item.eventHash,
+                            previousHash: item.previousHash,
+                            ledgerHash: item.ledgerHash,
+                            timestamp: item.timestamp,
+                        });
+                    }
+                }
+            } catch {}
+        }
+    }
 
     addEvent(
         drugSerialNumber: string,
@@ -50,6 +82,22 @@ export class LedgerService {
         };
 
         this.ledger.push(entry);
+
+        if (this.ledgerRepo) {
+            this.ledgerRepo
+                .save(
+                    this.ledgerRepo.create({
+                        index,
+                        drugSerialNumber,
+                        eventId,
+                        eventHash,
+                        previousHash,
+                        ledgerHash,
+                        timestamp: entry.timestamp,
+                    }),
+                )
+                .catch(() => {});
+        }
 
         return entry;
     }
@@ -106,6 +154,10 @@ export class LedgerService {
 
         this.ledger[index].eventHash = 'TAMPERED';
 
+        if (this.ledgerRepo) {
+            this.ledgerRepo.update({ index }, { eventHash: 'TAMPERED' }).catch(() => {});
+        }
+
         return true;
     }
 
@@ -129,10 +181,16 @@ export class LedgerService {
             return false;
         }
         this.ledger[index].eventHash = newHash;
+        if (this.ledgerRepo) {
+            this.ledgerRepo.update({ index }, { eventHash: newHash }).catch(() => {});
+        }
         return true;
     }
 
     resetLedger(): void {
         this.ledger.length = 0;
+        if (this.ledgerRepo) {
+            this.ledgerRepo.clear().catch(() => {});
+        }
     }
 }
