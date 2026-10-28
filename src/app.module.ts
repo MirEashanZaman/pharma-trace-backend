@@ -13,6 +13,7 @@ import { LedgerModule } from './ledger/ledger.module';
 import { BlockchainModule } from './blockchain/blockchain.module';
 import { AuthModule } from './auth/auth.module';
 import { ComplianceModule } from './compliance/compliance.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ComplianceModule } from './compliance/compliance.module';
       ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     }),
 
+    RedisModule,
     DrugsModule,
     DrugEventsModule,
     IotModule,
