@@ -18,6 +18,8 @@ export type LoadBalanceStrategy = 'ROUND_ROBIN' | 'LEAST_CONNECTIONS' | 'PRIORIT
 export class RpcLoadBalancer {
     private readonly logger = new Logger(RpcLoadBalancer.name);
     private nodes: IRpcNode[] = [];
+    private readonly nodeMap: Map<string, IRpcNode> = new Map();
+    private readonly urlMap: Map<string, IRpcNode> = new Map();
     private currentIndex: number = 0;
     private readonly maxFailureThreshold: number = 3;
 
@@ -61,10 +63,16 @@ export class RpcLoadBalancer {
                 lastLatencyMs: 65,
             },
         ];
+        this.nodeMap.clear();
+        this.urlMap.clear();
+        for (const node of this.nodes) {
+            this.nodeMap.set(node.id, node);
+            this.urlMap.set(node.url, node);
+        }
     }
 
     registerNode(node: Omit<IRpcNode, 'activeRequests' | 'consecutiveFailures' | 'totalRequests' | 'lastLatencyMs'>): void {
-        const existing = this.nodes.find((n) => n.id === node.id || n.url === node.url);
+        const existing = this.nodeMap.get(node.id) || this.urlMap.get(node.url);
         if (existing) {
             existing.weight = node.weight;
             existing.name = node.name;
@@ -72,23 +80,29 @@ export class RpcLoadBalancer {
             return;
         }
 
-        this.nodes.push({
+        const newNode: IRpcNode = {
             ...node,
             activeRequests: 0,
             consecutiveFailures: 0,
             totalRequests: 0,
             lastLatencyMs: 0,
-        });
+        };
+        this.nodes.push(newNode);
+        this.nodeMap.set(newNode.id, newNode);
+        this.urlMap.set(newNode.url, newNode);
     }
 
     selectNode(strategy: LoadBalanceStrategy = 'ROUND_ROBIN', candidates?: IRpcNode[]): IRpcNode {
         const pool = candidates || this.nodes;
         const healthyNodes = pool.filter((n) => n.isHealthy);
         if (healthyNodes.length === 0) {
-            this.logger.warn('All RPC nodes marked unhealthy. Emergency recovery probe triggered on primary.');
-            this.nodes[0].isHealthy = true;
-            this.nodes[0].consecutiveFailures = 0;
-            return this.nodes[0];
+            if (this.nodes.length > 0) {
+                this.logger.warn('All RPC nodes marked unhealthy. Emergency recovery probe triggered on primary.');
+                this.nodes[0].isHealthy = true;
+                this.nodes[0].consecutiveFailures = 0;
+                return this.nodes[0];
+            }
+            throw new Error('RpcLoadBalancer: No RPC nodes configured');
         }
 
         switch (strategy) {
@@ -133,13 +147,13 @@ export class RpcLoadBalancer {
                 const result = await operation(node);
                 const latency = Date.now() - start;
                 this.recordSuccess(node.id, latency);
-                node.activeRequests = Math.max(0, node.activeRequests - 1);
                 return { result, servedBy: node };
             } catch (err: any) {
-                node.activeRequests = Math.max(0, node.activeRequests - 1);
                 this.recordFailure(node.id);
                 lastError = err;
                 this.logger.warn(`Node ${node.id} (${node.name}) failed operation: ${err.message}. Failing over.`);
+            } finally {
+                node.activeRequests = Math.max(0, node.activeRequests - 1);
             }
         }
 
@@ -147,7 +161,7 @@ export class RpcLoadBalancer {
     }
 
     recordSuccess(nodeId: string, latencyMs: number): void {
-        const node = this.nodes.find((n) => n.id === nodeId);
+        const node = this.nodeMap.get(nodeId);
         if (node) {
             node.consecutiveFailures = 0;
             node.isHealthy = true;
@@ -156,7 +170,7 @@ export class RpcLoadBalancer {
     }
 
     recordFailure(nodeId: string): void {
-        const node = this.nodes.find((n) => n.id === nodeId);
+        const node = this.nodeMap.get(nodeId);
         if (node) {
             node.consecutiveFailures++;
             if (node.consecutiveFailures >= this.maxFailureThreshold) {
@@ -167,7 +181,7 @@ export class RpcLoadBalancer {
     }
 
     resetNodeHealth(nodeId: string): void {
-        const node = this.nodes.find((n) => n.id === nodeId);
+        const node = this.nodeMap.get(nodeId);
         if (node) {
             node.isHealthy = true;
             node.consecutiveFailures = 0;
