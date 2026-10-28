@@ -66,6 +66,7 @@ export class BatchAttestationEngine {
         this.trees.set(batchId, tree);
 
         for (const item of items) {
+            this.itemToBatchIndex.set(`${item.serialNumber}:${item.eventType}`, batchId);
             this.itemToBatchIndex.set(item.serialNumber, batchId);
         }
 
@@ -83,7 +84,7 @@ export class BatchAttestationEngine {
     }
 
     verifyItemInclusion(serialNumber: string, item: BatchItem): BatchInclusionResult {
-        const batchId = this.itemToBatchIndex.get(serialNumber);
+        const batchId = this.itemToBatchIndex.get(`${serialNumber}:${item.eventType}`) || this.itemToBatchIndex.get(serialNumber);
         if (!batchId) {
             return {
                 isValid: false,
@@ -96,21 +97,45 @@ export class BatchAttestationEngine {
             };
         }
 
-        const batch = this.batches.get(batchId)!;
-        const tree = this.trees.get(batchId)!;
-        const leaf = this.computeLeaf(item);
-        const proof = tree.getProof(leaf);
-        const isValid = MerkleTree.verifyProof(leaf, proof, batch.merkleRoot);
+        const batch = this.batches.get(batchId);
+        const tree = this.trees.get(batchId);
+        if (!batch || !tree) {
+            return {
+                isValid: false,
+                batchId,
+                merkleRoot: batch?.merkleRoot || '',
+                leaf: '',
+                proof: [],
+                ipfsCid: batch?.ipfsCid || '',
+                anchoredAt: batch?.anchoredAt || 0,
+            };
+        }
 
-        return {
-            isValid,
-            batchId,
-            merkleRoot: batch.merkleRoot,
-            leaf,
-            proof,
-            ipfsCid: batch.ipfsCid,
-            anchoredAt: batch.anchoredAt,
-        };
+        const leaf = this.computeLeaf(item);
+        try {
+            const proof = tree.getProof(leaf);
+            const isValid = MerkleTree.verifyProof(leaf, proof, batch.merkleRoot);
+
+            return {
+                isValid,
+                batchId,
+                merkleRoot: batch.merkleRoot,
+                leaf,
+                proof,
+                ipfsCid: batch.ipfsCid,
+                anchoredAt: batch.anchoredAt,
+            };
+        } catch {
+            return {
+                isValid: false,
+                batchId,
+                merkleRoot: batch.merkleRoot,
+                leaf,
+                proof: [],
+                ipfsCid: batch.ipfsCid,
+                anchoredAt: batch.anchoredAt,
+            };
+        }
     }
 
     getBatch(batchId: string): AnchoredBatch | undefined {
