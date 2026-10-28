@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { keccak256, toUtf8Bytes, getBytes } from 'ethers';
+import { keccak256, toUtf8Bytes } from 'ethers';
 
 export interface ZkSnarkProof {
     protocol: 'groth16';
@@ -85,7 +85,16 @@ export class ZkProofEngine {
     }
 
     verifyColdChainProof(proof: ZkSnarkProof): ZkColdChainVerificationResult {
-        if (proof.protocol !== 'groth16' || proof.curve !== 'bn128') {
+        if (
+            !proof ||
+            proof.protocol !== 'groth16' ||
+            proof.curve !== 'bn128' ||
+            !Array.isArray(proof.publicSignals) ||
+            proof.publicSignals.length < 5 ||
+            !proof.pi_a?.[0] ||
+            !proof.pi_c?.[0] ||
+            !proof.pi_b?.[0]?.[0]
+        ) {
             return {
                 isValid: false,
                 batchHash: '',
@@ -102,9 +111,8 @@ export class ZkProofEngine {
         const max = parseFloat(maxStr);
         const readings = parseInt(countStr, 10);
 
-        const aBytes = getBytes(proof.pi_a[0]);
-        const cBytes = getBytes(proof.pi_c[0]);
-        const isValidSignature = aBytes.length === 32 && cBytes.length === 32;
+        const hex32Regex = /^0x[0-9a-fA-F]{64}$/;
+        const isValidSignature = hex32Regex.test(proof.pi_a[0]) && hex32Regex.test(proof.pi_c[0]);
 
         const proofDigest = keccak256(
             toUtf8Bytes(`${proof.pi_a[0]}:${proof.pi_b[0][0]}:${proof.pi_c[0]}`),
@@ -154,7 +162,14 @@ export class ZkProofEngine {
     }
 
     verifyMembershipProof(proof: ZkSnarkProof): ZkMembershipVerificationResult {
-        if (proof.protocol !== 'groth16' || proof.curve !== 'bn128') {
+        if (
+            !proof ||
+            proof.protocol !== 'groth16' ||
+            proof.curve !== 'bn128' ||
+            !Array.isArray(proof.publicSignals) ||
+            proof.publicSignals.length < 2 ||
+            !proof.pi_a?.[0]
+        ) {
             return {
                 isValid: false,
                 merkleRoot: '',
