@@ -1,14 +1,21 @@
-import { keccak256, getBytes } from 'ethers';
+import { keccak256 } from 'ethers';
 
 export class MerkleTree {
     private readonly leaves: string[];
     private readonly layers: string[][];
+    private readonly leafIndexMap: Map<string, number>;
 
     constructor(leaves: string[]) {
         if (!leaves || leaves.length === 0) {
             throw new Error('MerkleTree requires at least one leaf');
         }
         this.leaves = leaves.map((leaf) => this.normalizeHash(leaf));
+        this.leafIndexMap = new Map<string, number>();
+        for (let i = 0; i < this.leaves.length; i++) {
+            if (!this.leafIndexMap.has(this.leaves[i])) {
+                this.leafIndexMap.set(this.leaves[i], i);
+            }
+        }
         this.layers = this.buildLayers(this.leaves);
     }
 
@@ -21,16 +28,9 @@ export class MerkleTree {
     }
 
     private hashPair(a: string, b: string): string {
-        const bufA = getBytes(a);
-        const bufB = getBytes(b);
-        for (let i = 0; i < 32; i++) {
-            if (bufA[i] < bufB[i]) {
-                return keccak256(new Uint8Array([...bufA, ...bufB])).toLowerCase();
-            } else if (bufA[i] > bufB[i]) {
-                return keccak256(new Uint8Array([...bufB, ...bufA])).toLowerCase();
-            }
-        }
-        return keccak256(new Uint8Array([...bufA, ...bufB])).toLowerCase();
+        const first = a <= b ? a : b;
+        const second = a <= b ? b : a;
+        return keccak256(first + second.slice(2)).toLowerCase();
     }
 
     private buildLayers(leaves: string[]): string[][] {
@@ -59,21 +59,22 @@ export class MerkleTree {
 
     getProof(leaf: string): string[] {
         const normalized = this.normalizeHash(leaf);
-        let index = this.leaves.indexOf(normalized);
-        if (index === -1) {
+        const index = this.leafIndexMap.get(normalized);
+        if (index === undefined) {
             throw new Error(`Leaf ${leaf} not found in MerkleTree`);
         }
 
+        let currentIndex = index;
         const proof: string[] = [];
         for (let i = 0; i < this.layers.length - 1; i++) {
             const layer = this.layers[i];
-            const isRightNode = index % 2 === 1;
-            const pairIndex = isRightNode ? index - 1 : index + 1;
+            const isRightNode = currentIndex % 2 === 1;
+            const pairIndex = isRightNode ? currentIndex - 1 : currentIndex + 1;
 
             if (pairIndex < layer.length) {
                 proof.push(layer[pairIndex]);
             }
-            index = Math.floor(index / 2);
+            currentIndex = Math.floor(currentIndex / 2);
         }
 
         return proof;
@@ -86,26 +87,10 @@ export class MerkleTree {
         const expectedRoot = root.toLowerCase();
 
         for (const sibling of proof) {
-            const bufA = getBytes(computed);
-            const bufB = getBytes(sibling.toLowerCase());
-            let aSmaller = false;
-            let equal = true;
-            for (let i = 0; i < 32; i++) {
-                if (bufA[i] < bufB[i]) {
-                    aSmaller = true;
-                    equal = false;
-                    break;
-                } else if (bufA[i] > bufB[i]) {
-                    aSmaller = false;
-                    equal = false;
-                    break;
-                }
-            }
-            if (equal || aSmaller) {
-                computed = keccak256(new Uint8Array([...bufA, ...bufB])).toLowerCase();
-            } else {
-                computed = keccak256(new Uint8Array([...bufB, ...bufA])).toLowerCase();
-            }
+            const sib = sibling.toLowerCase();
+            const first = computed <= sib ? computed : sib;
+            const second = computed <= sib ? sib : computed;
+            computed = keccak256(first + second.slice(2)).toLowerCase();
         }
 
         return computed === expectedRoot;
