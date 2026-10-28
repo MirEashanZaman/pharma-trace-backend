@@ -17,8 +17,19 @@ export class IpfsService {
     private readonly pinnedStorage: Map<string, { dossier: IpfsPinnedDossier; data: any }> = new Map();
     private readonly gatewayBase: string = process.env.IPFS_GATEWAY_URL || 'https://dweb.link/ipfs/';
 
-    computeCid(content: string): string {
-        const hashHex = sha256(toUtf8Bytes(content)).replace(/^0x/, '');
+    private canonicalStringify(obj: any): string {
+        if (obj === null || typeof obj !== 'object') {
+            return JSON.stringify(obj);
+        }
+        if (Array.isArray(obj)) {
+            return '[' + obj.map((item) => this.canonicalStringify(item)).join(',') + ']';
+        }
+        const keys = Object.keys(obj).sort();
+        return '{' + keys.map((key) => JSON.stringify(key) + ':' + this.canonicalStringify(obj[key])).join(',') + '}';
+    }
+
+    private computeCidFromBytes(bytes: Uint8Array): string {
+        const hashHex = sha256(bytes).replace(/^0x/, '');
         const base32Alphabet = 'abcdefghijklmnopqrstuvwxyz234567';
         let base32 = '';
         for (let i = 0; i < hashHex.length; i += 2) {
@@ -28,15 +39,20 @@ export class IpfsService {
         return `bafybeic${base32.slice(0, 32)}`;
     }
 
+    computeCid(content: string): string {
+        return this.computeCidFromBytes(toUtf8Bytes(content));
+    }
+
     async pinJson(payload: any, name?: string): Promise<IpfsPinnedDossier> {
         if (!payload) {
             throw new Error('Payload cannot be null or undefined');
         }
 
-        const serialized = JSON.stringify(payload, Object.keys(payload).sort());
-        const cid = this.computeCid(serialized);
-        const payloadHash = sha256(toUtf8Bytes(serialized));
-        const sizeBytes = Buffer.byteLength(serialized, 'utf8');
+        const serialized = this.canonicalStringify(payload);
+        const utf8Bytes = toUtf8Bytes(serialized);
+        const cid = this.computeCidFromBytes(utf8Bytes);
+        const payloadHash = sha256(utf8Bytes);
+        const sizeBytes = utf8Bytes.length;
 
         const dossier: IpfsPinnedDossier = {
             cid,
@@ -62,7 +78,7 @@ export class IpfsService {
     }
 
     verifyCid(cid: string, payload: any): boolean {
-        const serialized = JSON.stringify(payload, Object.keys(payload).sort());
+        const serialized = this.canonicalStringify(payload);
         const expectedCid = this.computeCid(serialized);
         return cid === expectedCid;
     }
