@@ -34,3 +34,4 @@ export class LedgerEntryEntity {
     @CreateDateColumn()
     timestamp!: Date;
 }
+
