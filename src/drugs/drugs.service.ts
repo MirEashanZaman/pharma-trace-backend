@@ -1,14 +1,17 @@
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Drug } from './entities/drug.entity';
 import { ComplianceDossierBuilder } from './builders/compliance-dossier.builder';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class DrugsService implements OnModuleInit {
     constructor(
         @InjectRepository(Drug)
         private readonly drugRepository: Repository<Drug>,
+        @Optional()
+        private readonly redisService?: RedisService,
     ) { }
 
     async onModuleInit() {
@@ -41,8 +44,11 @@ export class DrugsService implements OnModuleInit {
         batchNumber: string;
     }) {
         const drug = this.drugRepository.create(data);
-
-        return this.drugRepository.save(drug);
+        const saved = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.set(`drug:${saved.serialNumber}`, saved, 120);
+        }
+        return saved;
     }
 
     async getAllDrugs(query?: {
@@ -86,16 +92,30 @@ export class DrugsService implements OnModuleInit {
         if (updateData.batchNumber !== undefined) {
             drug.batchNumber = updateData.batchNumber;
         }
-        return this.drugRepository.save(drug);
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+        return updated;
     }
 
     async deleteDrug(serialNumber: string) {
         const drug = await this.getDrugBySerialNumber(serialNumber);
         await this.drugRepository.remove(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
         return { deleted: true, serialNumber };
     }
 
     async getDrugBySerialNumber(serialNumber: string) {
+        if (this.redisService) {
+            const cached = await this.redisService.get<Drug>(`drug:${serialNumber}`);
+            if (cached) {
+                return cached;
+            }
+        }
+
         const drug = await this.drugRepository.findOne({
             where: {
                 serialNumber,
@@ -106,6 +126,10 @@ export class DrugsService implements OnModuleInit {
             throw new NotFoundException(
                 `Drug with serial number ${serialNumber} not found`,
             );
+        }
+
+        if (this.redisService) {
+            await this.redisService.set(`drug:${serialNumber}`, drug, 120);
         }
 
         return drug;
