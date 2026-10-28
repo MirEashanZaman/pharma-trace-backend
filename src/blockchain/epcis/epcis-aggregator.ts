@@ -66,7 +66,8 @@ export class EpcisAggregator {
             child.locationGln = locationGln;
         }
 
-        const payload = `${parentSscc}:${parentLevel}:${childIds.sort().join(',')}:${Date.now()}`;
+        const sortedChildren = [...childIds].sort();
+        const payload = `${parentSscc}:${parentLevel}:${sortedChildren.join(',')}:${Date.now()}`;
         const aggregationHash = keccak256(toUtf8Bytes(payload));
 
         const event: EpcisAggregationEvent = {
@@ -127,8 +128,10 @@ export class EpcisAggregator {
         }
 
         const ancestors: string[] = [];
+        const visited = new Set<string>();
         let curr: EpcisPackagingNode | undefined = node;
-        while (curr?.parentId) {
+        while (curr?.parentId && !visited.has(curr.parentId)) {
+            visited.add(curr.parentId);
             ancestors.push(curr.parentId);
             curr = this.nodes.get(curr.parentId);
         }
