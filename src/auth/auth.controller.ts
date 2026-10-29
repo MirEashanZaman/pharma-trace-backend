@@ -18,6 +18,7 @@ import {
     ForgotPasswordDto,
     VerifyOtpDto,
     ResetPasswordDto,
+    UpdateProfileDto,
 } from './dto/auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
@@ -90,9 +91,9 @@ export class AuthController {
     @Put('profile')
     updateProfile(
         @Request() req: any,
-        @Body() body: { fullName?: string; organization?: string },
+        @Body() dto: UpdateProfileDto,
     ) {
-        return this.authService.updateProfile(req.user.userId, body);
+        return this.authService.updateProfile(req.user.userId, dto);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
