@@ -98,8 +98,43 @@ export class AuthController {
 
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(UserRole.ADMIN)
+    @Post('users/:id/warn')
+    warnUser(
+        @Request() req: any,
+        @Param('id') id: string,
+        @Body() body: { reason?: string },
+    ) {
+        return this.authService.warnUser(Number(id), body?.reason || 'Compliance violation', req.user.userId);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    @Post('users/:id/clear-warnings')
+    clearWarnings(
+        @Request() req: any,
+        @Param('id') id: string,
+    ) {
+        return this.authService.clearWarnings(Number(id), req.user.userId);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    @Put('users/:id/disable')
+    toggleDisableUser(
+        @Request() req: any,
+        @Param('id') id: string,
+        @Body() body: { disabled: boolean; reason?: string },
+    ) {
+        return this.authService.setDisabledStatus(Number(id), body.disabled, req.user.userId, body?.reason);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
     @Delete('users/:id')
-    deleteUser(@Param('id') id: string) {
-        return this.authService.deleteUser(Number(id));
+    deleteUser(
+        @Request() req: any,
+        @Param('id') id: string,
+    ) {
+        return this.authService.deleteUser(Number(id), req.user.userId);
     }
 }
