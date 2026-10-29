@@ -42,6 +42,12 @@ export class User {
     @Column({ nullable: true })
     organization?: string;
 
+    @Column({ nullable: true })
+    resetPasswordOtpHash?: string;
+
+    @Column({ nullable: true })
+    resetPasswordOtpExpires?: Date;
+
     @CreateDateColumn()
     createdAt!: Date;
 
