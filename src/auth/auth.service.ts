@@ -126,6 +126,9 @@ export class AuthService implements OnModuleInit {
     }
 
     async register(dto: RegisterDto) {
+        if (dto.role === UserRole.ADMIN) {
+            throw new ForbiddenException('Admin role cannot be self-registered');
+        }
         const existing = await this.userRepository.findOne({
             where: { email: dto.email },
         });
@@ -360,8 +363,8 @@ export class AuthService implements OnModuleInit {
         if (updateData.walletAddress !== undefined) {
             user.walletAddress = updateData.walletAddress ? updateData.walletAddress.trim().toLowerCase() : undefined;
         }
-        if (updateData.role !== undefined) {
-            user.role = updateData.role;
+        if ((updateData as any).role !== undefined && (updateData as any).role !== user.role) {
+            throw new BadRequestException('Role cannot be modified after registration');
         }
         if (updateData.password && updateData.password.trim().length >= 6) {
             user.password = await bcrypt.hash(updateData.password.trim(), 10);
