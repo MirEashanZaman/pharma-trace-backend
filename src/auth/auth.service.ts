@@ -44,7 +44,11 @@ export class AuthService implements OnModuleInit {
             await this.userRepository.query(`
                 ALTER TABLE "users" 
                 ADD COLUMN IF NOT EXISTS "resetPasswordOtpHash" VARCHAR,
-                ADD COLUMN IF NOT EXISTS "resetPasswordOtpExpires" TIMESTAMP;
+                ADD COLUMN IF NOT EXISTS "resetPasswordOtpExpires" TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS "isDisabled" BOOLEAN DEFAULT false,
+                ADD COLUMN IF NOT EXISTS "warningCount" INTEGER DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS "warningReason" VARCHAR,
+                ADD COLUMN IF NOT EXISTS "warningIssuedAt" TIMESTAMP;
             `);
         } catch {
         }
@@ -145,6 +149,10 @@ export class AuthService implements OnModuleInit {
         });
         if (!user || !user.password) {
             throw new UnauthorizedException('Invalid credentials');
+        }
+
+        if (user.isDisabled) {
+            throw new UnauthorizedException('This account has been temporarily disabled by an administrator. Please contact compliance.');
         }
 
         const isMatch = await bcrypt.compare(dto.password, user.password);
@@ -288,6 +296,10 @@ export class AuthService implements OnModuleInit {
             user = await this.userRepository.save(user);
         }
 
+        if (user.isDisabled) {
+            throw new UnauthorizedException('This account has been temporarily disabled by an administrator. Please contact compliance.');
+        }
+
         return this.generateToken(user);
     }
 
@@ -296,7 +308,10 @@ export class AuthService implements OnModuleInit {
         if (!user) {
             throw new UnauthorizedException('User not found');
         }
-        const { password, ...safeUser } = user;
+        if (user.isDisabled) {
+            throw new UnauthorizedException('This account has been temporarily disabled by an administrator.');
+        }
+        const { password, resetPasswordOtpHash, resetPasswordOtpExpires, ...safeUser } = user;
         return safeUser;
     }
 
@@ -310,7 +325,7 @@ export class AuthService implements OnModuleInit {
             take: limit ? Number(limit) : undefined,
             order: { id: 'ASC' },
         });
-        return users.map(({ password, ...safeUser }) => safeUser);
+        return users.map(({ password, resetPasswordOtpHash, resetPasswordOtpExpires, ...safeUser }) => safeUser);
     }
 
     async getUserById(id: number) {
@@ -318,7 +333,7 @@ export class AuthService implements OnModuleInit {
         if (!user) {
             throw new BadRequestException(`User with id ${id} not found`);
         }
-        const { password, ...safeUser } = user;
+        const { password, resetPasswordOtpHash, resetPasswordOtpExpires, ...safeUser } = user;
         return safeUser;
     }
 
@@ -347,12 +362,73 @@ export class AuthService implements OnModuleInit {
         return safeUser;
     }
 
-    async deleteUser(id: number) {
-        const user = await this.userRepository.findOne({ where: { id } });
-        if (!user) {
+    async warnUser(id: number, reason: string, adminUserId?: number) {
+        const target = await this.userRepository.findOne({ where: { id } });
+        if (!target) {
             throw new BadRequestException(`User with id ${id} not found`);
         }
-        await this.userRepository.remove(user);
+        if (target.role === UserRole.ADMIN) {
+            throw new ForbiddenException('Administrators cannot issue warnings to other administrator accounts.');
+        }
+        if (adminUserId && target.id === adminUserId) {
+            throw new ForbiddenException('Administrators cannot issue warnings to their own account.');
+        }
+        target.warningCount = (target.warningCount || 0) + 1;
+        target.warningReason = reason || 'Regulatory compliance violation warning';
+        target.warningIssuedAt = new Date();
+        const updated = await this.userRepository.save(target);
+        const { password, resetPasswordOtpHash, resetPasswordOtpExpires, ...safeUser } = updated;
+        return safeUser;
+    }
+
+    async clearWarnings(id: number, adminUserId?: number) {
+        const target = await this.userRepository.findOne({ where: { id } });
+        if (!target) {
+            throw new BadRequestException(`User with id ${id} not found`);
+        }
+        if (target.role === UserRole.ADMIN) {
+            throw new ForbiddenException('Cannot modify other administrator accounts.');
+        }
+        target.warningCount = 0;
+        target.warningReason = undefined;
+        target.warningIssuedAt = undefined;
+        const updated = await this.userRepository.save(target);
+        const { password, resetPasswordOtpHash, resetPasswordOtpExpires, ...safeUser } = updated;
+        return safeUser;
+    }
+
+    async setDisabledStatus(id: number, disabled: boolean, adminUserId?: number, reason?: string) {
+        const target = await this.userRepository.findOne({ where: { id } });
+        if (!target) {
+            throw new BadRequestException(`User with id ${id} not found`);
+        }
+        if (target.role === UserRole.ADMIN) {
+            throw new ForbiddenException('Administrators cannot disable other administrator accounts.');
+        }
+        if (adminUserId && target.id === adminUserId) {
+            throw new ForbiddenException('Administrators cannot disable their own account.');
+        }
+        target.isDisabled = disabled;
+        if (disabled && reason) {
+            target.warningReason = reason;
+        }
+        const updated = await this.userRepository.save(target);
+        const { password, resetPasswordOtpHash, resetPasswordOtpExpires, ...safeUser } = updated;
+        return safeUser;
+    }
+
+    async deleteUser(id: number, adminUserId?: number) {
+        const target = await this.userRepository.findOne({ where: { id } });
+        if (!target) {
+            throw new BadRequestException(`User with id ${id} not found`);
+        }
+        if (target.role === UserRole.ADMIN) {
+            throw new ForbiddenException('Administrators cannot delete other administrator accounts.');
+        }
+        if (adminUserId && target.id === adminUserId) {
+            throw new ForbiddenException('Administrators cannot delete their own account.');
+        }
+        await this.userRepository.remove(target);
         return { deleted: true, id };
     }
 
@@ -370,8 +446,13 @@ export class AuthService implements OnModuleInit {
                 id: user.id,
                 email: user.email,
                 role: user.role,
+                fullName: user.fullName,
                 walletAddress: user.walletAddress,
                 organization: user.organization,
+                isDisabled: user.isDisabled || false,
+                warningCount: user.warningCount || 0,
+                warningReason: user.warningReason,
+                warningIssuedAt: user.warningIssuedAt,
             },
         };
     }
