@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { jwtConstants } from './constants';
 import { BlockchainModule } from '../blockchain/blockchain.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
     imports: [
@@ -19,6 +20,7 @@ import { BlockchainModule } from '../blockchain/blockchain.module';
             signOptions: { expiresIn: '7d' },
         }),
         BlockchainModule,
+        MailModule,
     ],
     controllers: [AuthController],
     providers: [AuthService, JwtStrategy],
