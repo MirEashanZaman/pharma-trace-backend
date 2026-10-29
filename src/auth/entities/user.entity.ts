@@ -48,6 +48,18 @@ export class User {
     @Column({ nullable: true })
     resetPasswordOtpExpires?: Date;
 
+    @Column({ default: false })
+    isDisabled!: boolean;
+
+    @Column({ default: 0 })
+    warningCount!: number;
+
+    @Column({ nullable: true })
+    warningReason?: string;
+
+    @Column({ nullable: true })
+    warningIssuedAt?: Date;
+
     @CreateDateColumn()
     createdAt!: Date;
 
