@@ -14,6 +14,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
 import { AuthModule } from './auth/auth.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { RedisModule } from './redis/redis.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { RedisModule } from './redis/redis.module';
     }),
 
     RedisModule,
+    MailModule,
     DrugsModule,
     DrugEventsModule,
     IotModule,
@@ -58,4 +60,4 @@ import { RedisModule } from './redis/redis.module';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}
