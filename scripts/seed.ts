@@ -94,13 +94,25 @@ async function seed() {
 
     const testDrugs = [
         {
+            serialNumber: 'DRUG-001',
+            drugName: 'Insulin Injection',
+            manufacturer: 'PharmaCare Ltd.',
+            batchNumber: 'BATCH-2026-001',
+        },
+        {
+            serialNumber: 'DRUG-002',
+            drugName: 'Pfizer COVID-19 Vaccine',
+            manufacturer: 'Pfizer-BioNTech',
+            batchNumber: 'BATCH-2026-002',
+        },
+        {
             serialNumber: 'SN-2026-AMOX500',
             drugName: 'Amoxicillin 500mg Capsule',
             manufacturer: 'Novartis Global',
             batchNumber: 'BATCH-2026-A1',
         },
         {
-            serialNumber: 'SN-2026-INSULIN100',
+            serialNumber: 'SN-2026-INSULIN',
             drugName: 'Recombinant Insulin 100IU/ml',
             manufacturer: 'Novo Nordisk',
             batchNumber: 'BATCH-2026-INS9',
@@ -112,7 +124,10 @@ async function seed() {
         if (!drug) {
             drug = await drugRepo.save(drugRepo.create(d));
             console.log(`Created Drug Batch: ${drug.serialNumber}`);
+        }
 
+        const eventCount = await eventRepo.count({ where: { drugSerialNumber: drug.serialNumber } });
+        if (eventCount === 0) {
             const payload = {
                 drugSerialNumber: drug.serialNumber,
                 eventType: EventType.MANUFACTURED,
