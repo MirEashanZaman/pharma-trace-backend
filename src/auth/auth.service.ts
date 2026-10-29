@@ -80,7 +80,7 @@ export class AuthService implements OnModuleInit {
             {
                 email: 'customer@pharma.com',
                 password: defaultPassword,
-                fullName: 'MirEashan Zaman',
+                fullName: 'Mir Eashan Zaman',
                 role: UserRole.CUSTOMER,
                 organization: 'Public Consumer / Patient',
                 walletAddress: '0xcd3b766cc5027d11055150d60447de35e1008473',
