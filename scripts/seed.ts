@@ -73,7 +73,7 @@ async function seed() {
         {
             email: 'customer@pharma.com',
             password: defaultPassword,
-            fullName: 'John Patient / Consumer',
+            fullName: 'MirEashan Zaman',
             role: UserRole.CUSTOMER,
             organization: 'Public Consumer / Patient',
             walletAddress: '0xcd3b766cc5027d11055150d60447de35e1008473',
@@ -85,6 +85,10 @@ async function seed() {
         if (!exists) {
             await userRepo.save(userRepo.create(u));
             console.log(`Created User [${u.role}]: ${u.email}`);
+        } else if (exists.fullName !== u.fullName) {
+            exists.fullName = u.fullName;
+            await userRepo.save(exists);
+            console.log(`Updated User [${u.role}]: ${u.email} to ${u.fullName}`);
         }
     }
 
