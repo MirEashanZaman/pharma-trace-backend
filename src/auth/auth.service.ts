@@ -34,7 +34,19 @@ export class AuthService implements OnModuleInit {
     ) {}
 
     async onModuleInit() {
+        await this.ensureSchema();
         await this.seedDefaultAccounts();
+    }
+
+    private async ensureSchema() {
+        try {
+            await this.userRepository.query(`
+                ALTER TABLE "users" 
+                ADD COLUMN IF NOT EXISTS "resetPasswordOtpHash" VARCHAR,
+                ADD COLUMN IF NOT EXISTS "resetPasswordOtpExpires" TIMESTAMP;
+            `);
+        } catch {
+        }
     }
 
     async seedDefaultAccounts() {
