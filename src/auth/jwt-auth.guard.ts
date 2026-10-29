@@ -23,7 +23,13 @@ export class JwtAuthGuard implements CanActivate {
             if (payload.exp && Date.now() >= payload.exp * 1000) {
                 throw new UnauthorizedException('Token has expired');
             }
-            req.user = payload;
+            const rawUserId = payload.userId ?? payload.sub ?? payload.id;
+            const parsedUserId = rawUserId ? Number(rawUserId) : undefined;
+            req.user = {
+                ...payload,
+                userId: parsedUserId,
+                id: parsedUserId,
+            };
             return true;
         } catch (err: any) {
             throw new UnauthorizedException(err.message || 'Unauthorized token');
