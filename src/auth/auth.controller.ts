@@ -67,7 +67,9 @@ export class AuthController {
     @UseGuards(JwtAuthGuard)
     @Get('profile')
     getProfile(@Request() req: any) {
-        return this.authService.getProfile(req.user.userId);
+        const rawId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
+        const userId = rawId ? Number(rawId) : NaN;
+        return this.authService.getProfile(userId);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -93,7 +95,9 @@ export class AuthController {
         @Request() req: any,
         @Body() dto: UpdateProfileDto,
     ) {
-        return this.authService.updateProfile(req.user.userId, dto);
+        const rawId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
+        const userId = rawId ? Number(rawId) : NaN;
+        return this.authService.updateProfile(userId, dto);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -104,7 +108,9 @@ export class AuthController {
         @Param('id') id: string,
         @Body() body: { reason?: string },
     ) {
-        return this.authService.warnUser(Number(id), body?.reason || 'Compliance violation', req.user.userId);
+        const rawAdminId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
+        const adminId = rawAdminId ? Number(rawAdminId) : undefined;
+        return this.authService.warnUser(Number(id), body?.reason || 'Compliance violation', adminId);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -114,7 +120,9 @@ export class AuthController {
         @Request() req: any,
         @Param('id') id: string,
     ) {
-        return this.authService.clearWarnings(Number(id), req.user.userId);
+        const rawAdminId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
+        const adminId = rawAdminId ? Number(rawAdminId) : undefined;
+        return this.authService.clearWarnings(Number(id), adminId);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -125,7 +133,9 @@ export class AuthController {
         @Param('id') id: string,
         @Body() body: { disabled: boolean; reason?: string },
     ) {
-        return this.authService.setDisabledStatus(Number(id), body.disabled, req.user.userId, body?.reason);
+        const rawAdminId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
+        const adminId = rawAdminId ? Number(rawAdminId) : undefined;
+        return this.authService.setDisabledStatus(Number(id), body.disabled, adminId, body?.reason);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -135,6 +145,8 @@ export class AuthController {
         @Request() req: any,
         @Param('id') id: string,
     ) {
-        return this.authService.deleteUser(Number(id), req.user.userId);
+        const rawAdminId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
+        const adminId = rawAdminId ? Number(rawAdminId) : undefined;
+        return this.authService.deleteUser(Number(id), adminId);
     }
 }
