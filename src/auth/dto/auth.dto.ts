@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, Length, MinLength } from 'class-validator';
 import { UserRole } from '../entities/user.entity';
 
 export class RegisterDto {
@@ -51,4 +51,31 @@ export class Web3LoginDto {
     @IsString()
     @IsOptional()
     organization?: string;
+}
+
+export class ForgotPasswordDto {
+    @IsEmail()
+    email!: string;
+}
+
+export class VerifyOtpDto {
+    @IsEmail()
+    email!: string;
+
+    @IsString()
+    @Length(6, 6)
+    otp!: string;
+}
+
+export class ResetPasswordDto {
+    @IsEmail()
+    email!: string;
+
+    @IsString()
+    @Length(6, 6)
+    otp!: string;
+
+    @IsString()
+    @MinLength(6)
+    newPassword!: string;
 }
