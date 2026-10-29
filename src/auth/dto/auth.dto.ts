@@ -85,10 +85,6 @@ export class UpdateProfileDto {
     @IsOptional()
     fullName?: string;
 
-    @IsEnum(UserRole)
-    @IsOptional()
-    role?: UserRole;
-
     @IsString()
     @IsOptional()
     walletAddress?: string;
