@@ -11,7 +11,14 @@ import {
     Query,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, Web3LoginDto } from './dto/auth.dto';
+import {
+    RegisterDto,
+    LoginDto,
+    Web3LoginDto,
+    ForgotPasswordDto,
+    VerifyOtpDto,
+    ResetPasswordDto,
+} from './dto/auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
 import { Roles } from './roles.decorator';
@@ -39,6 +46,21 @@ export class AuthController {
     @Post('web3-login')
     web3Login(@Body() dto: Web3LoginDto) {
         return this.authService.web3Login(dto);
+    }
+
+    @Post('forgot-password')
+    forgotPassword(@Body() dto: ForgotPasswordDto) {
+        return this.authService.forgotPassword(dto);
+    }
+
+    @Post('verify-otp')
+    verifyOtp(@Body() dto: VerifyOtpDto) {
+        return this.authService.verifyOtp(dto);
+    }
+
+    @Post('reset-password')
+    resetPassword(@Body() dto: ResetPasswordDto) {
+        return this.authService.resetPassword(dto);
     }
 
     @UseGuards(JwtAuthGuard)
