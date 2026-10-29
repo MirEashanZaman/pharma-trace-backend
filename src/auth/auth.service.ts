@@ -19,6 +19,7 @@ import {
     ForgotPasswordDto,
     VerifyOtpDto,
     ResetPasswordDto,
+    UpdateProfileDto,
 } from './dto/auth.dto';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { MailService } from '../mail/mail.service';
@@ -321,7 +322,7 @@ export class AuthService implements OnModuleInit {
         return safeUser;
     }
 
-    async updateProfile(userId: number, updateData: { fullName?: string; organization?: string }) {
+    async updateProfile(userId: number, updateData: UpdateProfileDto) {
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user) {
             throw new UnauthorizedException('User not found');
@@ -332,8 +333,17 @@ export class AuthService implements OnModuleInit {
         if (updateData.organization !== undefined) {
             user.organization = updateData.organization;
         }
+        if (updateData.walletAddress !== undefined) {
+            user.walletAddress = updateData.walletAddress ? updateData.walletAddress.trim().toLowerCase() : undefined;
+        }
+        if (updateData.role !== undefined) {
+            user.role = updateData.role;
+        }
+        if (updateData.password && updateData.password.trim().length >= 6) {
+            user.password = await bcrypt.hash(updateData.password.trim(), 10);
+        }
         const updated = await this.userRepository.save(user);
-        const { password, ...safeUser } = updated;
+        const { password, resetPasswordOtpHash, resetPasswordOtpExpires, ...safeUser } = updated;
         return safeUser;
     }
 
