@@ -15,23 +15,35 @@ export class DrugsService implements OnModuleInit {
     ) { }
 
     async onModuleInit() {
-        const count = await this.drugRepository.count();
-        if (count === 0) {
-            const testDrugs = [
-                {
-                    serialNumber: 'SN-2026-AMOX500',
-                    drugName: 'Amoxicillin 500mg Capsule',
-                    manufacturer: 'Novartis Global',
-                    batchNumber: 'BATCH-2026-A1',
-                },
-                {
-                    serialNumber: 'SN-2026-INSULIN100',
-                    drugName: 'Recombinant Insulin 100IU/ml',
-                    manufacturer: 'Novo Nordisk',
-                    batchNumber: 'BATCH-2026-INS9',
-                },
-            ];
-            for (const d of testDrugs) {
+        const testDrugs = [
+            {
+                serialNumber: 'DRUG-001',
+                drugName: 'Insulin Injection',
+                manufacturer: 'PharmaCare Ltd.',
+                batchNumber: 'BATCH-2026-001',
+            },
+            {
+                serialNumber: 'DRUG-002',
+                drugName: 'Pfizer COVID-19 Vaccine',
+                manufacturer: 'Pfizer-BioNTech',
+                batchNumber: 'BATCH-2026-002',
+            },
+            {
+                serialNumber: 'SN-2026-AMOX500',
+                drugName: 'Amoxicillin 500mg Capsule',
+                manufacturer: 'Novartis Global',
+                batchNumber: 'BATCH-2026-A1',
+            },
+            {
+                serialNumber: 'SN-2026-INSULIN',
+                drugName: 'Recombinant Insulin 100IU/ml',
+                manufacturer: 'Novo Nordisk',
+                batchNumber: 'BATCH-2026-INS9',
+            },
+        ];
+        for (const d of testDrugs) {
+            const exists = await this.drugRepository.findOne({ where: { serialNumber: d.serialNumber } });
+            if (!exists) {
                 await this.drugRepository.save(this.drugRepository.create(d));
             }
         }
