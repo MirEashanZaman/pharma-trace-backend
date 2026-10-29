@@ -79,3 +79,26 @@ export class ResetPasswordDto {
     @MinLength(6)
     newPassword!: string;
 }
+
+export class UpdateProfileDto {
+    @IsString()
+    @IsOptional()
+    fullName?: string;
+
+    @IsEnum(UserRole)
+    @IsOptional()
+    role?: UserRole;
+
+    @IsString()
+    @IsOptional()
+    walletAddress?: string;
+
+    @IsString()
+    @IsOptional()
+    organization?: string;
+
+    @IsString()
+    @MinLength(6)
+    @IsOptional()
+    password?: string;
+}
