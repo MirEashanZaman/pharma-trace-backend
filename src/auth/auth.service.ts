@@ -10,9 +10,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { User, UserRole } from './entities/user.entity';
-import { RegisterDto, LoginDto, Web3LoginDto } from './dto/auth.dto';
+import {
+    RegisterDto,
+    LoginDto,
+    Web3LoginDto,
+    ForgotPasswordDto,
+    VerifyOtpDto,
+    ResetPasswordDto,
+} from './dto/auth.dto';
 import { BlockchainService } from '../blockchain/blockchain.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -21,6 +30,7 @@ export class AuthService implements OnModuleInit {
         private readonly userRepository: Repository<User>,
         private readonly jwtService: JwtService,
         private readonly blockchainService: BlockchainService,
+        private readonly mailService: MailService,
     ) {}
 
     async onModuleInit() {
@@ -98,7 +108,6 @@ export class AuthService implements OnModuleInit {
         }
     }
 
-    
     async register(dto: RegisterDto) {
         const existing = await this.userRepository.findOne({
             where: { email: dto.email },
@@ -117,7 +126,6 @@ export class AuthService implements OnModuleInit {
         return this.generateToken(saved);
     }
 
-    
     async login(dto: LoginDto) {
         const user = await this.userRepository.findOne({
             where: { email: dto.email },
@@ -134,7 +142,84 @@ export class AuthService implements OnModuleInit {
         return this.generateToken(user);
     }
 
-    
+    async forgotPassword(dto: ForgotPasswordDto) {
+        const user = await this.userRepository.findOne({
+            where: { email: dto.email.toLowerCase().trim() },
+        });
+
+        if (!user) {
+            throw new BadRequestException('No account registered with this email address');
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpHash = createHash('sha256').update(otp).digest('hex');
+
+        user.resetPasswordOtpHash = otpHash;
+        user.resetPasswordOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+        await this.userRepository.save(user);
+
+        await this.mailService.sendPasswordResetOtp(user.email, otp);
+
+        return {
+            success: true,
+            message: 'A 6-digit verification code has been sent to your email.',
+            previewOtp: otp,
+        };
+    }
+
+    async verifyOtp(dto: VerifyOtpDto) {
+        const user = await this.userRepository.findOne({
+            where: { email: dto.email.toLowerCase().trim() },
+        });
+
+        if (!user || !user.resetPasswordOtpHash || !user.resetPasswordOtpExpires) {
+            throw new BadRequestException('No active password reset request found for this email');
+        }
+
+        if (new Date() > new Date(user.resetPasswordOtpExpires)) {
+            throw new BadRequestException('Verification code has expired. Please request a new one.');
+        }
+
+        const inputHash = createHash('sha256').update(dto.otp.trim()).digest('hex');
+        if (inputHash !== user.resetPasswordOtpHash) {
+            throw new BadRequestException('Invalid verification code. Please check and try again.');
+        }
+
+        return {
+            success: true,
+            message: 'Verification code verified successfully',
+        };
+    }
+
+    async resetPassword(dto: ResetPasswordDto) {
+        const user = await this.userRepository.findOne({
+            where: { email: dto.email.toLowerCase().trim() },
+        });
+
+        if (!user || !user.resetPasswordOtpHash || !user.resetPasswordOtpExpires) {
+            throw new BadRequestException('No active password reset session found');
+        }
+
+        if (new Date() > new Date(user.resetPasswordOtpExpires)) {
+            throw new BadRequestException('Verification code has expired. Please request a new one.');
+        }
+
+        const inputHash = createHash('sha256').update(dto.otp.trim()).digest('hex');
+        if (inputHash !== user.resetPasswordOtpHash) {
+            throw new BadRequestException('Invalid verification code');
+        }
+
+        user.password = await bcrypt.hash(dto.newPassword, 10);
+        user.resetPasswordOtpHash = undefined;
+        user.resetPasswordOtpExpires = undefined;
+        await this.userRepository.save(user);
+
+        return {
+            success: true,
+            message: 'Password reset successfully. You can now sign in with your new password.',
+        };
+    }
+
     private readonly activeNonces: Map<string, { nonce: string; expiresAt: number }> = new Map();
 
     generateChallenge(walletAddress: string): { challenge: string; nonce: string; expiresAt: number } {
