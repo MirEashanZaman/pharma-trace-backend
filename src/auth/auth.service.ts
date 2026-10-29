@@ -304,6 +304,9 @@ export class AuthService implements OnModuleInit {
     }
 
     async getProfile(userId: number) {
+        if (!userId || isNaN(userId)) {
+            throw new UnauthorizedException('Invalid user identification in session token');
+        }
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user) {
             throw new UnauthorizedException('User not found');
@@ -329,6 +332,9 @@ export class AuthService implements OnModuleInit {
     }
 
     async getUserById(id: number) {
+        if (!id || isNaN(id)) {
+            throw new BadRequestException('Invalid user ID provided');
+        }
         const user = await this.userRepository.findOne({ where: { id } });
         if (!user) {
             throw new BadRequestException(`User with id ${id} not found`);
@@ -338,6 +344,9 @@ export class AuthService implements OnModuleInit {
     }
 
     async updateProfile(userId: number, updateData: UpdateProfileDto) {
+        if (!userId || isNaN(userId)) {
+            throw new UnauthorizedException('Invalid user identification in session token');
+        }
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user) {
             throw new UnauthorizedException('User not found');
@@ -435,6 +444,8 @@ export class AuthService implements OnModuleInit {
     private generateToken(user: User) {
         const payload = {
             sub: user.id,
+            userId: user.id,
+            id: user.id,
             email: user.email,
             role: user.role,
             walletAddress: user.walletAddress,
