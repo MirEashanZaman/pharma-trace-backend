@@ -34,6 +34,14 @@ export class DrugsService implements OnModuleInit {
                 inboundInspectionStatus: 'ACCEPTED_AT_DOCK',
                 storageZone: 'ZONE_A_COLD_2_8',
                 assignedVehicleId: 'VAN-408',
+                patientLeafletSummary: 'Recombinant human insulin for glycemic management in diabetes mellitus.',
+                patientDosageInstructions: 'Administer subcutaneously 15 to 30 minutes prior to meals as directed by physician.',
+                patientStorageAdvice: 'Refrigerate at 2°C to 8°C. Do not freeze. Protect from direct sunlight.',
+                patientSideEffects: 'Hypoglycemia, mild local injection site erythema, lipodystrophy.',
+                prescriptionNumber: 'RX-884920',
+                prescribingDoctor: 'Dr. Robert Vance, MD',
+                dispensedByPharmacist: 'Sarah Jenkins, PharmD',
+                patientToken: 'PT-7701',
             },
             {
                 serialNumber: 'DRUG-002',
@@ -70,6 +78,14 @@ export class DrugsService implements OnModuleInit {
                 inboundInspectionStatus: 'ACCEPTED_AT_DOCK',
                 storageZone: 'ZONE_A_COLD_2_8',
                 assignedVehicleId: 'VAN-408',
+                patientLeafletSummary: 'Broad-spectrum beta-lactam penicillin antibiotic indicated for bacterial infections.',
+                patientDosageInstructions: 'Take 1 capsule orally every 8 hours with full glass of water. Complete full course.',
+                patientStorageAdvice: 'Store at controlled room temperature 20°C to 25°C in original moisture-proof blister.',
+                patientSideEffects: 'Mild nausea, diarrhea, abdominal cramps, mild skin rash.',
+                prescriptionNumber: 'RX-991244',
+                prescribingDoctor: 'Dr. Emily Chen, MD',
+                dispensedByPharmacist: 'Sarah Jenkins, PharmD',
+                patientToken: 'PT-4421',
             },
             {
                 serialNumber: 'SN-2026-INSULIN',
@@ -795,6 +811,60 @@ export class DrugsService implements OnModuleInit {
             totalDrugsEvaluated: totalDrugs,
             totalAuditEventsEvaluated: totalEvents,
             certificationHash: `SHA256:ALCOA-${Date.now().toString().slice(-8)}-AUTHENTICATED`,
+        };
+    }
+
+    async publicSubmitPatientReport(
+        serialNumber: string,
+        data: {
+            reportType: string;
+            description: string;
+            contactEmail?: string;
+            severity?: string;
+            physicalFlaw?: string;
+        },
+    ) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+
+        drug.patientReportCount = (drug.patientReportCount || 0) + 1;
+        drug.lastPatientReportAt = new Date();
+
+        if (data.reportType === 'SUSPECTED_COUNTERFEIT') {
+            drug.regulatoryInvestigationStatus = 'UNDER_INVESTIGATION';
+            if (!drug.regulatoryInvestigationDocket) {
+                drug.regulatoryInvestigationDocket = `PATIENT-ESC-${Date.now().toString().slice(-6)}`;
+            }
+            drug.regulatoryForensicNotes = `Patient flagged suspicious physical attributes: ${data.physicalFlaw || data.description}`;
+        }
+
+        if (data.severity === 'LIFE_THREATENING' || data.severity === 'HOSPITALIZATION') {
+            drug.qcStatus = 'QUARANTINED';
+            drug.custodyLocation = 'Quarantine - Patient Safety Alert Hold';
+        }
+
+        const reportId = `PATIENT-RPT-${Date.now().toString().slice(-8)}`;
+
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+
+        return {
+            confirmationId: reportId,
+            serialNumber: updated.serialNumber,
+            drugName: updated.name,
+            batchNumber: updated.batchNumber,
+            reportType: data.reportType,
+            status: 'RECEIVED_AND_QUEUED_FOR_TRIAGE',
+            receivedAt: new Date().toISOString(),
+            safetyAdvisory:
+                data.reportType === 'SUSPECTED_COUNTERFEIT'
+                    ? 'Do not consume this medication. Keep the packaging and blister pack intact for regulatory forensics.'
+                    : 'If experiencing severe or worsening symptoms, call 911 or visit the nearest emergency medical center immediately.',
+            emergencyHotlines: {
+                poisonControl: '1-800-222-1222',
+                fdaMedWatch: '1-800-FDA-1088',
+            },
         };
     }
 
