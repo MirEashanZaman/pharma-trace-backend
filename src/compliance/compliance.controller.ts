@@ -15,6 +15,7 @@ import {
   ComplianceAuditLogger,
 } from './solid/services/compliance-services';
 import type { IComplianceRule, ComplianceData } from './solid/compliance.types';
+import { AuditLoggingInterceptor } from '../common/interceptors/audit-logging.interceptor';
 
 export class EvaluateComplianceDto {
   serialNumber!: string;
@@ -81,6 +82,16 @@ export class ComplianceController {
       return logs.slice(-Number(limit));
     }
     return logs;
+  }
+
+  @Get('live-audit')
+  getLiveAudit(
+    @Query('limit') limit?: string,
+    @Query('role') role?: string,
+    @Query('method') method?: string,
+  ) {
+    const lim = limit ? parseInt(limit, 10) : 100;
+    return AuditLoggingInterceptor.getAuditRecords(lim, role, method);
   }
 
   @Get('verify/:batchNumber/:digest')
