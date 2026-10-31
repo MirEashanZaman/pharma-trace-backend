@@ -24,6 +24,10 @@ export class RegisterDto {
     @IsString()
     @IsOptional()
     organization?: string;
+
+    @IsString()
+    @IsOptional()
+    invitationToken?: string;
 }
 
 export class LoginDto {
@@ -51,6 +55,10 @@ export class Web3LoginDto {
     @IsString()
     @IsOptional()
     organization?: string;
+
+    @IsString()
+    @IsOptional()
+    invitationToken?: string;
 }
 
 export class ForgotPasswordDto {
@@ -97,4 +105,16 @@ export class UpdateProfileDto {
     @MinLength(6)
     @IsOptional()
     password?: string;
+}
+
+export class CreateInvitationDto {
+    @IsString()
+    organizationName!: string;
+
+    @IsEnum(UserRole)
+    assignedRole!: UserRole;
+
+    @IsEmail()
+    @IsOptional()
+    recipientEmail?: string;
 }
