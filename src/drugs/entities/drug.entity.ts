@@ -226,6 +226,24 @@ export class Drug {
     @Column({ nullable: true })
     adeReportedAt?: Date;
 
+    @Column({ default: 0 })
+    patientReportCount!: number;
+
+    @Column({ nullable: true })
+    lastPatientReportAt?: Date;
+
+    @Column({ nullable: true })
+    patientLeafletSummary?: string;
+
+    @Column({ nullable: true })
+    patientDosageInstructions?: string;
+
+    @Column({ nullable: true })
+    patientStorageAdvice?: string;
+
+    @Column({ nullable: true })
+    patientSideEffects?: string;
+
     @CreateDateColumn()
     createdAt!: Date;
 
