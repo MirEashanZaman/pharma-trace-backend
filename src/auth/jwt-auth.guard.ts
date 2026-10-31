@@ -1,8 +1,11 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Optional } from '@nestjs/common';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-    canActivate(context: ExecutionContext): boolean {
+    constructor(@Optional() private readonly redisService?: RedisService) {}
+
+    async canActivate(context: ExecutionContext): Promise<boolean> {
         const req = context.switchToHttp().getRequest();
         if (!req || !req.headers) {
             return true;
@@ -13,7 +16,7 @@ export class JwtAuthGuard implements CanActivate {
             throw new UnauthorizedException('Missing or invalid bearer token');
         }
 
-        const token = authHeader.slice(7);
+        const token = authHeader.slice(7).trim();
         try {
             const parts = token.split('.');
             if (parts.length !== 3) {
@@ -25,6 +28,20 @@ export class JwtAuthGuard implements CanActivate {
             }
             const rawUserId = payload.userId ?? payload.sub ?? payload.id;
             const parsedUserId = rawUserId ? Number(rawUserId) : undefined;
+
+            if (this.redisService) {
+                const isBlacklisted = await this.redisService.get<boolean>(`blacklist:token:${token}`);
+                if (isBlacklisted) {
+                    throw new UnauthorizedException('Session token has been revoked. Please sign in again.');
+                }
+                if (parsedUserId) {
+                    const isDisabled = await this.redisService.get<boolean>(`user:disabled:${parsedUserId}`);
+                    if (isDisabled) {
+                        throw new UnauthorizedException('This account has been temporarily disabled by an administrator.');
+                    }
+                }
+            }
+
             req.user = {
                 ...payload,
                 userId: parsedUserId,
