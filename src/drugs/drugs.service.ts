@@ -432,6 +432,148 @@ export class DrugsService implements OnModuleInit {
         return updated;
     }
 
+    async pharmacyReceiveInbound(
+        serialNumber: string,
+        data: {
+            disposition: 'ACCEPTED' | 'REJECTED';
+            receivingTemp: number;
+            storageLocation: string;
+            pharmacistName: string;
+            pharmacistLicense: string;
+            notes?: string;
+            pharmacyName?: string;
+        },
+    ) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+        drug.pharmacyInboundTemp = Number(data.receivingTemp);
+        drug.pharmacyInboundNotes = data.notes;
+        drug.pharmacyInboundPharmacist = data.pharmacistName;
+        drug.pharmacyInboundLicense = data.pharmacistLicense;
+        drug.pharmacyInboundAt = new Date();
+
+        if (data.disposition === 'ACCEPTED') {
+            drug.pharmacyInboundStatus = 'ACCEPTED';
+            drug.currentCustodian = data.pharmacyName || drug.targetPharmacy || 'St. Jude Central Pharmacy';
+            drug.custodyLocation = `${data.pharmacyName || drug.targetPharmacy || 'Pharmacy'} - ${data.storageLocation}`;
+            drug.pharmacyStorageLocation = data.storageLocation || 'FRIDGE_VACCINE_1';
+        } else {
+            drug.pharmacyInboundStatus = 'REJECTED';
+            drug.qcStatus = 'QUARANTINED';
+            drug.isRecalled = true;
+            drug.custodyLocation = 'Pharmacy Inbound Quarantine - GxP Excursion / Seal Broken';
+            drug.pharmacyStorageLocation = 'QUARANTINE_REJECT';
+        }
+
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+        return updated;
+    }
+
+    async pharmacyDispensePrescription(
+        serialNumber: string,
+        data: {
+            prescriptionNumber: string;
+            prescribingDoctor: string;
+            patientToken: string;
+            pharmacistName: string;
+            notes?: string;
+        },
+    ) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+
+        if (drug.prescriptionNumber || drug.dispensedAt) {
+            throw new BadRequestException(
+                `Anti-Double-Dispensing Alert: Medicine unit ${serialNumber} has already been dispensed under Rx #${drug.prescriptionNumber} on ${drug.dispensedAt}. Halting dispense transaction to prevent potential counterfeit cloning or duplicate packaging.`,
+            );
+        }
+
+        if (drug.isRecalled || drug.qcStatus === 'QUARANTINED') {
+            throw new BadRequestException(
+                `Clinical Dispense Blocked: Medicine unit ${serialNumber} is currently under regulatory recall or quarantine. It cannot be dispensed to a patient.`,
+            );
+        }
+
+        if (drug.expiryDate) {
+            const expiry = new Date(drug.expiryDate).getTime();
+            if (!isNaN(expiry) && expiry < Date.now()) {
+                throw new BadRequestException(
+                    `Clinical Dispense Blocked: Medicine unit ${serialNumber} expired on ${new Date(drug.expiryDate).toLocaleDateString()}. Expired medications cannot be dispensed.`,
+                );
+            }
+        }
+
+        drug.prescriptionNumber = data.prescriptionNumber;
+        drug.prescribingDoctor = data.prescribingDoctor;
+        drug.patientToken = data.patientToken;
+        drug.dispensedByPharmacist = data.pharmacistName;
+        drug.dispensedAt = new Date();
+        drug.dispenseNotes = data.notes;
+        drug.currentCustodian = `Patient (${data.patientToken})`;
+        drug.custodyLocation = 'Patient Custody (Dispensed)';
+
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+        return updated;
+    }
+
+    async pharmacyDisposeOrReturn(
+        serialNumber: string,
+        data: {
+            action: 'DESTROY' | 'RETURN';
+            reason: string;
+            witnessPharmacist?: string;
+            certificateId?: string;
+        },
+    ) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+
+        if (data.action === 'DESTROY') {
+            drug.qcStatus = 'DESTROYED';
+            drug.destructionCertificateId = data.certificateId || `CERT-DEST-${Date.now().toString().slice(-8)}`;
+            drug.destructionReason = data.reason;
+            drug.destructionWitness = data.witnessPharmacist;
+            drug.destroyedAt = new Date();
+            drug.custodyLocation = 'Certified Hazardous Waste Incineration';
+            drug.currentCustodian = 'Stericycle Biohazard Destruction Facility';
+        } else {
+            drug.qcStatus = 'RETURNED';
+            drug.returnReason = data.reason;
+            drug.returnedToDistributorAt = new Date();
+            drug.custodyLocation = 'In Transit - Reverse Logistics to Distributor';
+            drug.currentCustodian = 'DHL Reverse Logistics Hub';
+        }
+
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+        return updated;
+    }
+
+    async pharmacyGetInventorySummary() {
+        const all = await this.drugRepository.find();
+        const vaccineFridge = all.filter((d) => d.pharmacyStorageLocation === 'FRIDGE_VACCINE_1').length;
+        const biologicsFridge = all.filter((d) => d.pharmacyStorageLocation === 'FRIDGE_BIOLOGICS_2').length;
+        const ambientShelf = all.filter((d) => d.pharmacyStorageLocation === 'SHELF_AMB_ORAL').length;
+        const narcoticsVault = all.filter((d) => d.pharmacyStorageLocation === 'VAULT_NARCOTICS').length;
+        const dispensedCount = all.filter((d) => !!d.dispensedAt).length;
+        const quarantinedCount = all.filter((d) => d.qcStatus === 'QUARANTINED' || d.isRecalled).length;
+
+        return {
+            totalUnits: all.length,
+            vaccineFridge,
+            biologicsFridge,
+            ambientShelf,
+            narcoticsVault,
+            dispensedCount,
+            quarantinedCount,
+        };
+    }
+
     async getAllDrugs(query?: {
         manufacturer?: string;
         batchNumber?: string;
