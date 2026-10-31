@@ -180,10 +180,69 @@ export class DrugsController {
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.PHARMACY, UserRole.ADMIN)
+    @Post(':serialNumber/pharmacy-receive')
+    pharmacyReceiveInbound(
+        @Param('serialNumber') serialNumber: string,
+        @Body()
+        data: {
+            disposition: 'ACCEPTED' | 'REJECTED';
+            receivingTemp: number;
+            storageLocation: string;
+            pharmacistName: string;
+            pharmacistLicense: string;
+            notes?: string;
+            pharmacyName?: string;
+        },
+    ) {
+        return this.drugsService.pharmacyReceiveInbound(serialNumber, data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.PHARMACY, UserRole.ADMIN)
+    @Post(':serialNumber/pharmacy-dispense')
+    pharmacyDispensePrescription(
+        @Param('serialNumber') serialNumber: string,
+        @Body()
+        data: {
+            prescriptionNumber: string;
+            prescribingDoctor: string;
+            patientToken: string;
+            pharmacistName: string;
+            notes?: string;
+        },
+    ) {
+        return this.drugsService.pharmacyDispensePrescription(serialNumber, data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.PHARMACY, UserRole.ADMIN)
+    @Post(':serialNumber/pharmacy-retire')
+    pharmacyDisposeOrReturn(
+        @Param('serialNumber') serialNumber: string,
+        @Body()
+        data: {
+            action: 'DESTROY' | 'RETURN';
+            reason: string;
+            witnessPharmacist?: string;
+            certificateId?: string;
+        },
+    ) {
+        return this.drugsService.pharmacyDisposeOrReturn(serialNumber, data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(UserRole.DISTRIBUTOR, UserRole.ADMIN, UserRole.REGULATOR)
     @Get('fleet/overview')
     getFleetOverview() {
         return this.drugsService.getFleetOverview();
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.REGULATOR)
+    @Get('pharmacy/inventory-summary')
+    getPharmacyInventorySummary() {
+        return this.drugsService.pharmacyGetInventorySummary();
     }
 
     @Get()
