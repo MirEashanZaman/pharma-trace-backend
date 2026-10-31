@@ -172,6 +172,60 @@ export class Drug {
     @Column({ nullable: true })
     returnedToDistributorAt?: Date;
 
+    @Column({ default: 'NONE' })
+    recallClass!: string;
+
+    @Column({ nullable: true })
+    recallDirectiveRef?: string;
+
+    @Column({ nullable: true })
+    recallAuthority?: string;
+
+    @Column({ nullable: true })
+    recallReason?: string;
+
+    @Column({ nullable: true })
+    recallIssuedAt?: Date;
+
+    @Column({ nullable: true })
+    regulatoryInvestigationDocket?: string;
+
+    @Column({ default: 'NOT_UNDER_INVESTIGATION' })
+    regulatoryInvestigationStatus!: string;
+
+    @Column({ nullable: true })
+    regulatoryForensicNotes?: string;
+
+    @Column({ nullable: true })
+    regulatoryAssayFinding?: string;
+
+    @Column({ nullable: true })
+    inspectionObservationRef?: string;
+
+    @Column({ default: 'NOT_INSPECTED' })
+    inspectionDisposition!: string;
+
+    @Column({ nullable: true })
+    inspectionCitation?: string;
+
+    @Column({ nullable: true })
+    inspectedInspectorBadge?: string;
+
+    @Column({ nullable: true })
+    inspectedFacility?: string;
+
+    @Column({ nullable: true })
+    adeReportId?: string;
+
+    @Column({ nullable: true })
+    adeSeverity?: string;
+
+    @Column({ nullable: true })
+    adeReactionDetails?: string;
+
+    @Column({ nullable: true })
+    adeReportedAt?: Date;
+
     @CreateDateColumn()
     createdAt!: Date;
 
