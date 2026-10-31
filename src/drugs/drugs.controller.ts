@@ -33,9 +33,80 @@ export class DrugsController {
             drugName: string;
             manufacturer: string;
             batchNumber: string;
+            dosageForm?: string;
+            strength?: string;
+            expiryDate?: string;
+            apiSupplier?: string;
+            apiCasNumber?: string;
+            rawMaterialLot?: string;
         },
     ) {
         return this.drugsService.createDrug(data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.MANUFACTURER, UserRole.ADMIN)
+    @Post('bulk')
+    bulkCreateDrugs(
+        @Body()
+        data: {
+            name: string;
+            manufacturer: string;
+            batchNumber: string;
+            expiryDate?: string;
+            quantity: number;
+            dosageForm?: string;
+            strength?: string;
+            apiSupplier?: string;
+            apiCasNumber?: string;
+            rawMaterialLot?: string;
+        },
+    ) {
+        return this.drugsService.bulkCreateDrugs(data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.MANUFACTURER, UserRole.ADMIN, UserRole.REGULATOR)
+    @Post(':serialNumber/qc-release')
+    submitQcRelease(
+        @Param('serialNumber') serialNumber: string,
+        @Body()
+        qcData: {
+            purityPercentage: number;
+            phLevel: number;
+            endotoxinLimit: string;
+            disposition: 'QC_PASSED' | 'FAILED_QC';
+            signedBy: string;
+        },
+    ) {
+        return this.drugsService.submitQcRelease(serialNumber, qcData);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.MANUFACTURER, UserRole.ADMIN)
+    @Post(':serialNumber/dispatch')
+    dispatchBatch(
+        @Param('serialNumber') serialNumber: string,
+        @Body()
+        dispatchData: {
+            carrierName: string;
+            sealNumber?: string;
+        },
+    ) {
+        return this.drugsService.dispatchBatch(serialNumber, dispatchData);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.MANUFACTURER, UserRole.ADMIN, UserRole.REGULATOR)
+    @Post('batch/:batchNumber/quarantine')
+    quarantineBatch(
+        @Param('batchNumber') batchNumber: string,
+        @Body()
+        body: {
+            reason?: string;
+        },
+    ) {
+        return this.drugsService.quarantineBatch(batchNumber, body?.reason);
     }
 
     @Get()
@@ -93,6 +164,12 @@ export class DrugsController {
             drugName?: string;
             manufacturer?: string;
             batchNumber?: string;
+            dosageForm?: string;
+            strength?: string;
+            expiryDate?: string;
+            apiSupplier?: string;
+            apiCasNumber?: string;
+            rawMaterialLot?: string;
         },
     ) {
         return this.drugsService.updateDrug(serialNumber, updateData);
