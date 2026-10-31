@@ -29,6 +29,11 @@ export class DrugsService implements OnModuleInit {
                 qcPurityPercentage: 99.85,
                 qcPhLevel: 7.35,
                 qcEndotoxinLimit: '< 0.2 EU/mL',
+                currentCustodian: 'DHL Healthcare Logistics',
+                custodyLocation: 'DHL Apex Cross-Dock Facility, Bay 4',
+                inboundInspectionStatus: 'ACCEPTED_AT_DOCK',
+                storageZone: 'ZONE_A_COLD_2_8',
+                assignedVehicleId: 'VAN-408',
             },
             {
                 serialNumber: 'DRUG-002',
@@ -42,6 +47,11 @@ export class DrugsService implements OnModuleInit {
                 qcPurityPercentage: 99.92,
                 qcPhLevel: 7.20,
                 qcEndotoxinLimit: '< 0.1 EU/mL',
+                currentCustodian: 'DHL Healthcare Logistics',
+                custodyLocation: 'Cold-Room Vault A - Ultra-Cold Zone',
+                inboundInspectionStatus: 'ACCEPTED_AT_DOCK',
+                storageZone: 'ZONE_B_FREEZER',
+                assignedVehicleId: 'TRUCK-112',
             },
             {
                 serialNumber: 'SN-2026-AMOX500',
@@ -55,6 +65,11 @@ export class DrugsService implements OnModuleInit {
                 qcPurityPercentage: 99.78,
                 qcPhLevel: 6.80,
                 qcEndotoxinLimit: '< 0.25 EU/mL',
+                currentCustodian: 'DHL Healthcare Logistics',
+                custodyLocation: 'DHL Apex Cross-Dock Facility, Bay 4',
+                inboundInspectionStatus: 'ACCEPTED_AT_DOCK',
+                storageZone: 'ZONE_A_COLD_2_8',
+                assignedVehicleId: 'VAN-408',
             },
             {
                 serialNumber: 'SN-2026-INSULIN',
@@ -68,6 +83,11 @@ export class DrugsService implements OnModuleInit {
                 qcPurityPercentage: 99.94,
                 qcPhLevel: 7.40,
                 qcEndotoxinLimit: '< 0.05 EU/mL',
+                currentCustodian: 'DHL Healthcare Logistics',
+                custodyLocation: 'DHL Metro Delivery Fleet',
+                inboundInspectionStatus: 'ACCEPTED_AT_DOCK',
+                storageZone: 'ZONE_A_COLD_2_8',
+                assignedVehicleId: 'SHUTTLE-07',
             },
         ];
         for (const d of testDrugs) {
@@ -223,6 +243,193 @@ export class DrugsService implements OnModuleInit {
             quarantinedCount: drugs.length,
             reason: reason || 'Plant-level quality deviation quarantine initiated by manufacturer',
         };
+    }
+
+    async receiveInbound(
+        serialNumber: string,
+        data: {
+            inspectionDisposition: 'ACCEPTED' | 'REJECTED';
+            sealVerified: boolean;
+            receivingTemp: number;
+            notes?: string;
+            inspectedBy: string;
+            location: string;
+            storageZone?: string;
+        },
+    ) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+        drug.inboundInspectionTemp = Number(data.receivingTemp);
+        drug.inboundInspectionNotes = data.notes;
+        drug.inboundInspectedBy = data.inspectedBy;
+        drug.inboundInspectedAt = new Date();
+
+        if (data.inspectionDisposition === 'ACCEPTED' && data.sealVerified) {
+            drug.inboundInspectionStatus = 'ACCEPTED_AT_DOCK';
+            drug.currentCustodian = 'DHL Healthcare Logistics';
+            drug.custodyLocation = data.location || 'DHL Apex Cross-Dock Facility';
+            drug.storageZone = data.storageZone || 'ZONE_A_COLD_2_8';
+        } else {
+            drug.inboundInspectionStatus = 'REJECTED_AT_DOCK';
+            drug.qcStatus = 'QUARANTINED';
+            drug.isRecalled = true;
+            drug.custodyLocation = 'Quarantine Holding Bay - Rejected Inbound';
+        }
+
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+        return updated;
+    }
+
+    async assignFleetVehicle(
+        serialNumber: string,
+        data: {
+            vehicleId: string;
+            driverName: string;
+            routeDestination: string;
+            targetPharmacy?: string;
+        },
+    ) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+        drug.assignedVehicleId = data.vehicleId;
+        drug.custodyLocation = `In Transit (${data.vehicleId}) -> ${data.routeDestination}`;
+        if (data.targetPharmacy) {
+            drug.targetPharmacy = data.targetPharmacy;
+        }
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+        return updated;
+    }
+
+    async getFleetOverview() {
+        const all = await this.drugRepository.find();
+        const van408Serials = all.filter((d) => d.assignedVehicleId === 'VAN-408').map((d) => d.serialNumber);
+        const truck112Serials = all.filter((d) => d.assignedVehicleId === 'TRUCK-112').map((d) => d.serialNumber);
+        const shuttle07Serials = all.filter((d) => d.assignedVehicleId === 'SHUTTLE-07').map((d) => d.serialNumber);
+
+        return [
+            {
+                vehicleId: 'VAN-408',
+                driverName: 'Marcus Vance',
+                model: 'Mercedes-Benz Sprinter Active Reefer',
+                route: 'Interstate 95 Express -> Regional Medical Centers',
+                status: 'IN_TRANSIT',
+                currentLocation: 'Mile Marker 142, Northbound I-95',
+                currentTemp: 4.2,
+                currentHumidity: 48,
+                batteryLevel: 94,
+                compressorStatus: 'ACTIVE_OPTIMAL',
+                targetTempRange: '2.0°C - 8.0°C',
+                assignedBatches: van408Serials,
+                hasExcursion: false,
+                lastPing: new Date().toISOString(),
+            },
+            {
+                vehicleId: 'TRUCK-112',
+                driverName: 'Elena Rostova',
+                model: 'Volvo FE Heavy Duty Cold-Chain Freight',
+                route: 'Central Packaging Depot -> Airport Crossdock',
+                status: 'LOADING_AT_CROSSDOCK',
+                currentLocation: 'Apex Logistics Terminal, Gate 12',
+                currentTemp: 3.8,
+                currentHumidity: 45,
+                batteryLevel: 88,
+                compressorStatus: 'PRE_COOLING',
+                targetTempRange: '2.0°C - 8.0°C',
+                assignedBatches: truck112Serials,
+                hasExcursion: false,
+                lastPing: new Date().toISOString(),
+            },
+            {
+                vehicleId: 'SHUTTLE-07',
+                driverName: 'David Kim',
+                model: 'Ford E-Transit Electric Cold Van',
+                route: 'Downtown Healthcare Corridor -> Hospital District',
+                status: 'DELIVERING',
+                currentLocation: '7th Avenue Medical Plaza',
+                currentTemp: 4.6,
+                currentHumidity: 52,
+                batteryLevel: 72,
+                compressorStatus: 'ACTIVE_OPTIMAL',
+                targetTempRange: '2.0°C - 8.0°C',
+                assignedBatches: shuttle07Serials,
+                hasExcursion: false,
+                lastPing: new Date().toISOString(),
+            },
+        ];
+    }
+
+    async createPharmacyManifest(data: {
+        manifestId?: string;
+        pharmacyName: string;
+        pharmacyAddress: string;
+        serialNumbers: string[];
+        vehicleId: string;
+        driverName: string;
+        departureSeal: string;
+    }) {
+        const manifestId = data.manifestId || `MAN-2026-${Date.now().toString().slice(-6)}`;
+        const updatedDrugs: Drug[] = [];
+
+        for (const sn of data.serialNumbers) {
+            const drug = await this.drugRepository.findOne({ where: { serialNumber: sn } });
+            if (drug) {
+                drug.targetPharmacy = data.pharmacyName;
+                drug.outboundManifestId = manifestId;
+                drug.assignedVehicleId = data.vehicleId;
+                drug.sealNumber = data.departureSeal;
+                drug.custodyLocation = `Dispatched in ${data.vehicleId} -> ${data.pharmacyName}`;
+                updatedDrugs.push(drug);
+            }
+        }
+
+        if (updatedDrugs.length > 0) {
+            await this.drugRepository.save(updatedDrugs);
+            if (this.redisService) {
+                for (const d of updatedDrugs) {
+                    await this.redisService.del(`drug:${d.serialNumber}`);
+                }
+            }
+        }
+
+        return {
+            manifestId,
+            pharmacyName: data.pharmacyName,
+            pharmacyAddress: data.pharmacyAddress,
+            vehicleId: data.vehicleId,
+            driverName: data.driverName,
+            departureSeal: data.departureSeal,
+            dispatchedSerials: updatedDrugs.map((d) => d.serialNumber),
+            dispatchedAt: new Date().toISOString(),
+            status: 'OUTBOUND_DISPATCHED',
+        };
+    }
+
+    async confirmPharmacyDelivery(
+        serialNumber: string,
+        data: {
+            pharmacistName: string;
+            pharmacistLicense: string;
+            deliveryTemp: number;
+            signatureHash?: string;
+            notes?: string;
+        },
+    ) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+        drug.currentCustodian = drug.targetPharmacy || 'CVS Central Hospital';
+        drug.custodyLocation = `${drug.targetPharmacy || 'Pharmacy'} - Receiving Pharmacy Vault`;
+        drug.deliveryProofSignature = data.signatureHash || `SIG-PHARM-${Date.now().toString().slice(-8)}`;
+        drug.deliveryProofReceivedBy = `${data.pharmacistName} (License: ${data.pharmacistLicense})`;
+        drug.deliveryProofDeliveredAt = new Date();
+
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+        return updated;
     }
 
     async getAllDrugs(query?: {
