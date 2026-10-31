@@ -245,6 +245,80 @@ export class DrugsController {
         return this.drugsService.pharmacyGetInventorySummary();
     }
 
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.REGULATOR, UserRole.ADMIN)
+    @Post('regulatory/facility-inspection')
+    regulatorIssueFacilityInspection(
+        @Body()
+        data: {
+            facility: string;
+            citation: string;
+            disposition: 'NAI' | 'VAI' | 'OAI';
+            observationRef: string;
+            inspectorBadge: string;
+            notes?: string;
+            batchNumber?: string;
+        },
+    ) {
+        return this.drugsService.regulatorIssueFacilityInspection(data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.REGULATOR, UserRole.ADMIN)
+    @Post('regulatory/enforce-recall')
+    regulatorEnforceRecall(
+        @Body()
+        data: {
+            target: string;
+            isBatch: boolean;
+            recallClass: 'CLASS_I' | 'CLASS_II' | 'CLASS_III';
+            directiveRef: string;
+            authority: string;
+            reason: string;
+        },
+    ) {
+        return this.drugsService.regulatorEnforceRecall(data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.REGULATOR, UserRole.ADMIN, UserRole.PHARMACY)
+    @Post('regulatory/medwatch-ade')
+    regulatorSubmitAdeReport(
+        @Body()
+        data: {
+            serialNumber: string;
+            adeReportId?: string;
+            severity: 'LIFE_THREATENING' | 'HOSPITALIZATION' | 'DISABILITY' | 'MILD';
+            reactionDetails: string;
+            reporterRole: string;
+        },
+    ) {
+        return this.drugsService.regulatorSubmitAdeReport(data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.REGULATOR, UserRole.ADMIN)
+    @Post('regulatory/investigation-docket')
+    regulatorUpdateInvestigationDocket(
+        @Body()
+        data: {
+            serialNumber: string;
+            docketNumber: string;
+            disposition: 'SEIZED_CONFIRMED_COUNTERFEIT' | 'CLEARED_LEGITIMATE' | 'UNDER_INVESTIGATION';
+            assayFindings: string;
+            forensicNotes?: string;
+        },
+    ) {
+        return this.drugsService.regulatorUpdateInvestigationDocket(data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.REGULATOR, UserRole.ADMIN)
+    @Get('regulatory/alcoa-analysis')
+    getRegulatorAlcoaAnalysis() {
+        return this.drugsService.regulatorGetAlcoaAnalysis();
+    }
+
     @Get()
     getAllDrugs(
         @Query('manufacturer') manufacturer?: string,
