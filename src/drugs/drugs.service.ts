@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Drug } from './entities/drug.entity';
 import { ComplianceDossierBuilder } from './builders/compliance-dossier.builder';
 import { RedisService } from '../redis/redis.service';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class DrugsService implements OnModuleInit {
@@ -21,24 +22,52 @@ export class DrugsService implements OnModuleInit {
                 drugName: 'Insulin Injection',
                 manufacturer: 'PharmaCare Ltd.',
                 batchNumber: 'BATCH-2026-001',
+                dosageForm: 'Injectable Solution',
+                strength: '100 IU/mL',
+                expiryDate: '2027-12-31',
+                qcStatus: 'RELEASED_FOR_TRANSIT',
+                qcPurityPercentage: 99.85,
+                qcPhLevel: 7.35,
+                qcEndotoxinLimit: '< 0.2 EU/mL',
             },
             {
                 serialNumber: 'DRUG-002',
                 drugName: 'Pfizer COVID-19 Vaccine',
                 manufacturer: 'Pfizer-BioNTech',
                 batchNumber: 'BATCH-2026-002',
+                dosageForm: 'Suspension for Injection',
+                strength: '30 mcg/0.3mL',
+                expiryDate: '2027-06-30',
+                qcStatus: 'RELEASED_FOR_TRANSIT',
+                qcPurityPercentage: 99.92,
+                qcPhLevel: 7.20,
+                qcEndotoxinLimit: '< 0.1 EU/mL',
             },
             {
                 serialNumber: 'SN-2026-AMOX500',
                 drugName: 'Amoxicillin 500mg Capsule',
                 manufacturer: 'Novartis Global',
                 batchNumber: 'BATCH-2026-A1',
+                dosageForm: 'Oral Capsule',
+                strength: '500 mg',
+                expiryDate: '2028-01-15',
+                qcStatus: 'RELEASED_FOR_TRANSIT',
+                qcPurityPercentage: 99.78,
+                qcPhLevel: 6.80,
+                qcEndotoxinLimit: '< 0.25 EU/mL',
             },
             {
                 serialNumber: 'SN-2026-INSULIN',
                 drugName: 'Recombinant Insulin 100IU/ml',
                 manufacturer: 'Novo Nordisk',
                 batchNumber: 'BATCH-2026-INS9',
+                dosageForm: 'Injectable Cartridge',
+                strength: '100 IU/mL',
+                expiryDate: '2027-09-15',
+                qcStatus: 'RELEASED_FOR_TRANSIT',
+                qcPurityPercentage: 99.94,
+                qcPhLevel: 7.40,
+                qcEndotoxinLimit: '< 0.05 EU/mL',
             },
         ];
         for (const d of testDrugs) {
@@ -54,13 +83,146 @@ export class DrugsService implements OnModuleInit {
         drugName: string;
         manufacturer: string;
         batchNumber: string;
+        dosageForm?: string;
+        strength?: string;
+        expiryDate?: string;
+        apiSupplier?: string;
+        apiCasNumber?: string;
+        rawMaterialLot?: string;
     }) {
-        const drug = this.drugRepository.create(data);
+        const drug = this.drugRepository.create({
+            ...data,
+            qcStatus: 'LAB_QUARANTINE',
+        });
         const saved = await this.drugRepository.save(drug);
         if (this.redisService) {
             await this.redisService.set(`drug:${saved.serialNumber}`, saved, 120);
         }
         return saved;
+    }
+
+    async bulkCreateDrugs(data: {
+        name: string;
+        manufacturer: string;
+        batchNumber: string;
+        expiryDate?: string;
+        quantity: number;
+        dosageForm?: string;
+        strength?: string;
+        apiSupplier?: string;
+        apiCasNumber?: string;
+        rawMaterialLot?: string;
+    }) {
+        const count = Math.min(Math.max(1, data.quantity || 1), 100);
+        const createdDrugs: Drug[] = [];
+        for (let i = 1; i <= count; i++) {
+            const serialNumber = `${data.batchNumber}-SN${String(i).padStart(3, '0')}`;
+            const existing = await this.drugRepository.findOne({ where: { serialNumber } });
+            if (!existing) {
+                const drug = this.drugRepository.create({
+                    serialNumber,
+                    drugName: data.name,
+                    manufacturer: data.manufacturer,
+                    batchNumber: data.batchNumber,
+                    expiryDate: data.expiryDate,
+                    dosageForm: data.dosageForm,
+                    strength: data.strength,
+                    apiSupplier: data.apiSupplier,
+                    apiCasNumber: data.apiCasNumber,
+                    rawMaterialLot: data.rawMaterialLot,
+                    qcStatus: 'LAB_QUARANTINE',
+                });
+                createdDrugs.push(drug);
+            }
+        }
+        const saved = await this.drugRepository.save(createdDrugs);
+        if (this.redisService) {
+            for (const item of saved) {
+                await this.redisService.set(`drug:${item.serialNumber}`, item, 120);
+            }
+        }
+        return saved;
+    }
+
+    async submitQcRelease(
+        serialNumber: string,
+        qcData: {
+            purityPercentage: number;
+            phLevel: number;
+            endotoxinLimit: string;
+            disposition: 'QC_PASSED' | 'FAILED_QC';
+            signedBy: string;
+        },
+    ) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+        const timestamp = new Date().toISOString();
+        const payload = JSON.stringify({
+            serialNumber,
+            batchNumber: drug.batchNumber,
+            ...qcData,
+            timestamp,
+        });
+        const certHash = createHash('sha256').update(payload).digest('hex');
+
+        drug.qcPurityPercentage = Number(qcData.purityPercentage);
+        drug.qcPhLevel = Number(qcData.phLevel);
+        drug.qcEndotoxinLimit = qcData.endotoxinLimit;
+        drug.qcStatus = qcData.disposition === 'QC_PASSED' ? 'RELEASED_FOR_TRANSIT' : 'FAILED_QC';
+        drug.qcCertHash = certHash;
+        drug.qcSignedBy = qcData.signedBy;
+        drug.qcSignedAt = new Date();
+
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+        return updated;
+    }
+
+    async dispatchBatch(
+        serialNumber: string,
+        dispatchData: {
+            carrierName: string;
+            sealNumber?: string;
+        },
+    ) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+        if (drug.qcStatus !== 'RELEASED_FOR_TRANSIT') {
+            throw new BadRequestException(
+                `Drug batch has not passed QC certification. Current status: ${drug.qcStatus}`,
+            );
+        }
+        drug.carrierName = dispatchData.carrierName;
+        drug.sealNumber = dispatchData.sealNumber;
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+        return updated;
+    }
+
+    async quarantineBatch(batchNumber: string, reason?: string) {
+        const drugs = await this.drugRepository.find({
+            where: { batchNumber },
+        });
+        if (!drugs.length) {
+            throw new NotFoundException(`No drugs found for batch ${batchNumber}`);
+        }
+        for (const drug of drugs) {
+            drug.qcStatus = 'QUARANTINED';
+            drug.isRecalled = true;
+        }
+        await this.drugRepository.save(drugs);
+        if (this.redisService) {
+            for (const d of drugs) {
+                await this.redisService.del(`drug:${d.serialNumber}`);
+            }
+        }
+        return {
+            batchNumber,
+            quarantinedCount: drugs.length,
+            reason: reason || 'Plant-level quality deviation quarantine initiated by manufacturer',
+        };
     }
 
     async getAllDrugs(query?: {
@@ -92,6 +254,12 @@ export class DrugsService implements OnModuleInit {
             drugName: string;
             manufacturer: string;
             batchNumber: string;
+            dosageForm?: string;
+            strength?: string;
+            expiryDate?: string;
+            apiSupplier?: string;
+            apiCasNumber?: string;
+            rawMaterialLot?: string;
         }>,
     ) {
         const drug = await this.getDrugBySerialNumber(serialNumber);
@@ -103,6 +271,24 @@ export class DrugsService implements OnModuleInit {
         }
         if (updateData.batchNumber !== undefined) {
             drug.batchNumber = updateData.batchNumber;
+        }
+        if (updateData.dosageForm !== undefined) {
+            drug.dosageForm = updateData.dosageForm;
+        }
+        if (updateData.strength !== undefined) {
+            drug.strength = updateData.strength;
+        }
+        if (updateData.expiryDate !== undefined) {
+            drug.expiryDate = updateData.expiryDate;
+        }
+        if (updateData.apiSupplier !== undefined) {
+            drug.apiSupplier = updateData.apiSupplier;
+        }
+        if (updateData.apiCasNumber !== undefined) {
+            drug.apiCasNumber = updateData.apiCasNumber;
+        }
+        if (updateData.rawMaterialLot !== undefined) {
+            drug.rawMaterialLot = updateData.rawMaterialLot;
         }
         const updated = await this.drugRepository.save(drug);
         if (this.redisService) {
