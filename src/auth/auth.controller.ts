@@ -19,6 +19,7 @@ import {
     VerifyOtpDto,
     ResetPasswordDto,
     UpdateProfileDto,
+    CreateInvitationDto,
 } from './dto/auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
@@ -158,5 +159,36 @@ export class AuthController {
         const userId = rawId ? Number(rawId) : undefined;
         await this.authService.logout(rawToken, userId);
         return { success: true, message: 'Session terminated and token revoked' };
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    @Post('invitations')
+    createInvitation(
+        @Request() req: any,
+        @Body() dto: CreateInvitationDto,
+    ) {
+        const rawAdminId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
+        const adminId = rawAdminId ? Number(rawAdminId) : undefined;
+        return this.authService.createInvitation(adminId, dto);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    @Get('invitations')
+    listInvitations() {
+        return this.authService.listInvitations();
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    @Delete('invitations/:id')
+    revokeInvitation(
+        @Request() req: any,
+        @Param('id') id: string,
+    ) {
+        const rawAdminId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
+        const adminId = rawAdminId ? Number(rawAdminId) : undefined;
+        return this.authService.revokeInvitation(Number(id), adminId);
     }
 }
