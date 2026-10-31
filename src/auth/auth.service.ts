@@ -23,6 +23,7 @@ import {
 } from './dto/auth.dto';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { MailService } from '../mail/mail.service';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -32,6 +33,7 @@ export class AuthService implements OnModuleInit {
         private readonly jwtService: JwtService,
         private readonly blockchainService: BlockchainService,
         private readonly mailService: MailService,
+        private readonly redisService: RedisService,
     ) {}
 
     async onModuleInit() {
@@ -425,6 +427,11 @@ export class AuthService implements OnModuleInit {
             target.warningReason = reason;
         }
         const updated = await this.userRepository.save(target);
+        if (disabled) {
+            await this.redisService.set(`user:disabled:${id}`, true, 604800);
+        } else {
+            await this.redisService.del(`user:disabled:${id}`);
+        }
         const { password, resetPasswordOtpHash, resetPasswordOtpExpires, ...safeUser } = updated;
         return safeUser;
     }
@@ -440,8 +447,18 @@ export class AuthService implements OnModuleInit {
         if (adminUserId && target.id === adminUserId) {
             throw new ForbiddenException('Administrators cannot delete their own account.');
         }
+        await this.redisService.set(`user:disabled:${id}`, true, 604800);
         await this.userRepository.remove(target);
         return { deleted: true, id };
+    }
+
+    async logout(token?: string, userId?: number): Promise<void> {
+        if (token) {
+            await this.redisService.set(`blacklist:token:${token}`, true, 604800);
+        }
+        if (userId) {
+            await this.redisService.del(`user:session:${userId}`);
+        }
     }
 
     private generateToken(user: User) {
