@@ -852,7 +852,7 @@ export class DrugsService implements OnModuleInit {
         return {
             confirmationId: reportId,
             serialNumber: updated.serialNumber,
-            drugName: updated.name,
+            drugName: updated.drugName,
             batchNumber: updated.batchNumber,
             reportType: data.reportType,
             status: 'RECEIVED_AND_QUEUED_FOR_TRIAGE',
