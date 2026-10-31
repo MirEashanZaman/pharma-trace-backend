@@ -115,6 +115,63 @@ export class Drug {
     @Column({ nullable: true })
     deliveryProofDeliveredAt?: Date;
 
+    @Column({ default: 'PENDING_PHARMACY' })
+    pharmacyInboundStatus!: string;
+
+    @Column({ type: 'float', nullable: true })
+    pharmacyInboundTemp?: number;
+
+    @Column({ nullable: true })
+    pharmacyInboundNotes?: string;
+
+    @Column({ nullable: true })
+    pharmacyInboundPharmacist?: string;
+
+    @Column({ nullable: true })
+    pharmacyInboundLicense?: string;
+
+    @Column({ nullable: true })
+    pharmacyInboundAt?: Date;
+
+    @Column({ nullable: true })
+    pharmacyStorageLocation?: string;
+
+    @Column({ nullable: true })
+    prescriptionNumber?: string;
+
+    @Column({ nullable: true })
+    prescribingDoctor?: string;
+
+    @Column({ nullable: true })
+    patientToken?: string;
+
+    @Column({ nullable: true })
+    dispensedByPharmacist?: string;
+
+    @Column({ nullable: true })
+    dispensedAt?: Date;
+
+    @Column({ nullable: true })
+    dispenseNotes?: string;
+
+    @Column({ nullable: true })
+    destructionCertificateId?: string;
+
+    @Column({ nullable: true })
+    destructionReason?: string;
+
+    @Column({ nullable: true })
+    destructionWitness?: string;
+
+    @Column({ nullable: true })
+    destroyedAt?: Date;
+
+    @Column({ nullable: true })
+    returnReason?: string;
+
+    @Column({ nullable: true })
+    returnedToDistributorAt?: Date;
+
     @CreateDateColumn()
     createdAt!: Date;
 
