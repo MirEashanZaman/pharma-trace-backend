@@ -364,6 +364,21 @@ export class DrugsController {
         return this.drugsService.getDrugBySerialNumber(serialNumber);
     }
 
+    @Post(':serialNumber/patient-report')
+    submitPatientReport(
+        @Param('serialNumber') serialNumber: string,
+        @Body()
+        data: {
+            reportType: string;
+            description: string;
+            contactEmail?: string;
+            severity?: string;
+            physicalFlaw?: string;
+        },
+    ) {
+        return this.drugsService.publicSubmitPatientReport(serialNumber, data);
+    }
+
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(UserRole.MANUFACTURER, UserRole.ADMIN)
     @Put(':serialNumber')
