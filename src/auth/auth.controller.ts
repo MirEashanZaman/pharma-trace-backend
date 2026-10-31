@@ -149,4 +149,14 @@ export class AuthController {
         const adminId = rawAdminId ? Number(rawAdminId) : undefined;
         return this.authService.deleteUser(Number(id), adminId);
     }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('logout')
+    async logout(@Request() req: any) {
+        const rawToken = req.headers?.authorization?.slice(7)?.trim();
+        const rawId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
+        const userId = rawId ? Number(rawId) : undefined;
+        await this.authService.logout(rawToken, userId);
+        return { success: true, message: 'Session terminated and token revoked' };
+    }
 }
