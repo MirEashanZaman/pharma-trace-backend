@@ -109,6 +109,83 @@ export class DrugsController {
         return this.drugsService.quarantineBatch(batchNumber, body?.reason);
     }
 
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.DISTRIBUTOR, UserRole.ADMIN)
+    @Post(':serialNumber/inbound-receive')
+    receiveInbound(
+        @Param('serialNumber') serialNumber: string,
+        @Body()
+        data: {
+            inspectionDisposition: 'ACCEPTED' | 'REJECTED';
+            sealVerified: boolean;
+            receivingTemp: number;
+            notes?: string;
+            inspectedBy: string;
+            location: string;
+            storageZone?: string;
+        },
+    ) {
+        return this.drugsService.receiveInbound(serialNumber, data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.DISTRIBUTOR, UserRole.ADMIN)
+    @Post(':serialNumber/assign-fleet')
+    assignFleetVehicle(
+        @Param('serialNumber') serialNumber: string,
+        @Body()
+        data: {
+            vehicleId: string;
+            driverName: string;
+            routeDestination: string;
+            targetPharmacy?: string;
+        },
+    ) {
+        return this.drugsService.assignFleetVehicle(serialNumber, data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.DISTRIBUTOR, UserRole.ADMIN)
+    @Post('manifests/pharmacy-dispatch')
+    createPharmacyManifest(
+        @Body()
+        data: {
+            manifestId?: string;
+            pharmacyName: string;
+            pharmacyAddress: string;
+            serialNumbers: string[];
+            vehicleId: string;
+            driverName: string;
+            departureSeal: string;
+        },
+    ) {
+        return this.drugsService.createPharmacyManifest(data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.DISTRIBUTOR, UserRole.PHARMACY, UserRole.ADMIN)
+    @Post(':serialNumber/confirm-delivery')
+    confirmPharmacyDelivery(
+        @Param('serialNumber') serialNumber: string,
+        @Body()
+        data: {
+            pharmacistName: string;
+            pharmacistLicense: string;
+            deliveryTemp: number;
+            signatureHash?: string;
+            notes?: string;
+        },
+    ) {
+        return this.drugsService.confirmPharmacyDelivery(serialNumber, data);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.DISTRIBUTOR, UserRole.ADMIN, UserRole.REGULATOR)
+    @Get('fleet/overview')
+    getFleetOverview() {
+        return this.drugsService.getFleetOverview();
+    }
+
     @Get()
     getAllDrugs(
         @Query('manufacturer') manufacturer?: string,
