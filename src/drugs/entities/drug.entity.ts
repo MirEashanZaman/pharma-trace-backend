@@ -73,6 +73,48 @@ export class Drug {
     @Column({ default: false })
     isRecalled!: boolean;
 
+    @Column({ nullable: true })
+    currentCustodian?: string;
+
+    @Column({ nullable: true })
+    custodyLocation?: string;
+
+    @Column({ default: 'PENDING_INBOUND' })
+    inboundInspectionStatus!: string;
+
+    @Column({ type: 'float', nullable: true })
+    inboundInspectionTemp?: number;
+
+    @Column({ nullable: true })
+    inboundInspectionNotes?: string;
+
+    @Column({ nullable: true })
+    inboundInspectedBy?: string;
+
+    @Column({ nullable: true })
+    inboundInspectedAt?: Date;
+
+    @Column({ nullable: true })
+    assignedVehicleId?: string;
+
+    @Column({ nullable: true })
+    storageZone?: string;
+
+    @Column({ nullable: true })
+    targetPharmacy?: string;
+
+    @Column({ nullable: true })
+    outboundManifestId?: string;
+
+    @Column({ nullable: true })
+    deliveryProofSignature?: string;
+
+    @Column({ nullable: true })
+    deliveryProofReceivedBy?: string;
+
+    @Column({ nullable: true })
+    deliveryProofDeliveredAt?: Date;
+
     @CreateDateColumn()
     createdAt!: Date;
 
