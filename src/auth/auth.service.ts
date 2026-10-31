@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
 import { User, UserRole } from './entities/user.entity';
+import { Invitation } from './entities/invitation.entity';
 import {
     RegisterDto,
     LoginDto,
@@ -20,6 +21,7 @@ import {
     VerifyOtpDto,
     ResetPasswordDto,
     UpdateProfileDto,
+    CreateInvitationDto,
 } from './dto/auth.dto';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { MailService } from '../mail/mail.service';
@@ -30,6 +32,8 @@ export class AuthService implements OnModuleInit {
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
+        @InjectRepository(Invitation)
+        private readonly invitationRepository: Repository<Invitation>,
         private readonly jwtService: JwtService,
         private readonly blockchainService: BlockchainService,
         private readonly mailService: MailService,
@@ -51,6 +55,20 @@ export class AuthService implements OnModuleInit {
                 ADD COLUMN IF NOT EXISTS "warningCount" INTEGER DEFAULT 0,
                 ADD COLUMN IF NOT EXISTS "warningReason" VARCHAR,
                 ADD COLUMN IF NOT EXISTS "warningIssuedAt" TIMESTAMP;
+            `);
+            await this.userRepository.query(`
+                CREATE TABLE IF NOT EXISTS "invitations" (
+                    "id" SERIAL PRIMARY KEY,
+                    "token" VARCHAR UNIQUE NOT NULL,
+                    "organizationName" VARCHAR NOT NULL,
+                    "assignedRole" VARCHAR NOT NULL DEFAULT 'MANUFACTURER',
+                    "recipientEmail" VARCHAR,
+                    "isClaimed" BOOLEAN DEFAULT false,
+                    "claimedByEmail" VARCHAR,
+                    "expiresAt" TIMESTAMP NOT NULL,
+                    "createdById" INTEGER,
+                    "createdAt" TIMESTAMP DEFAULT now()
+                );
             `);
         } catch {
         }
@@ -131,6 +149,24 @@ export class AuthService implements OnModuleInit {
         if (dto.role === UserRole.ADMIN) {
             throw new ForbiddenException('Admin role cannot be self-registered');
         }
+
+        if (dto.invitationToken) {
+            const invitation = await this.invitationRepository.findOne({
+                where: { token: dto.invitationToken.trim() },
+            });
+            if (!invitation || invitation.isClaimed || new Date() > new Date(invitation.expiresAt)) {
+                throw new BadRequestException('Invalid, already claimed, or expired enterprise invitation token');
+            }
+            if (invitation.recipientEmail && invitation.recipientEmail.toLowerCase() !== dto.email.toLowerCase()) {
+                throw new ForbiddenException(`This invitation token is reserved for ${invitation.recipientEmail}`);
+            }
+            dto.role = invitation.assignedRole;
+            dto.organization = invitation.organizationName;
+            invitation.isClaimed = true;
+            invitation.claimedByEmail = dto.email;
+            await this.invitationRepository.save(invitation);
+        }
+
         const existing = await this.userRepository.findOne({
             where: { email: dto.email },
         });
@@ -459,6 +495,43 @@ export class AuthService implements OnModuleInit {
         if (userId) {
             await this.redisService.del(`user:session:${userId}`);
         }
+    }
+
+    async createInvitation(adminUserId: number | undefined, dto: CreateInvitationDto) {
+        if (dto.assignedRole === UserRole.ADMIN) {
+            throw new ForbiddenException('Administrator invitations cannot be generated');
+        }
+        const token = 'INV-' + createHash('sha256')
+            .update(`${Date.now()}-${Math.random()}-${dto.organizationName}`)
+            .digest('hex')
+            .slice(0, 20)
+            .toUpperCase();
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const inv = this.invitationRepository.create({
+            token,
+            organizationName: dto.organizationName.trim(),
+            assignedRole: dto.assignedRole,
+            recipientEmail: dto.recipientEmail?.trim().toLowerCase(),
+            expiresAt,
+            createdById: adminUserId,
+        });
+        return this.invitationRepository.save(inv);
+    }
+
+    async listInvitations() {
+        return this.invitationRepository.find({
+            order: { createdAt: 'DESC' },
+            take: 50,
+        });
+    }
+
+    async revokeInvitation(id: number, adminUserId?: number) {
+        const inv = await this.invitationRepository.findOne({ where: { id } });
+        if (!inv) {
+            throw new BadRequestException('Invitation not found');
+        }
+        await this.invitationRepository.remove(inv);
+        return { revoked: true, id };
     }
 
     private generateToken(user: User) {
