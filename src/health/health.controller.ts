@@ -31,3 +31,4 @@ export class HealthController {
         return this.healthService.getReadiness();
     }
 }
+
