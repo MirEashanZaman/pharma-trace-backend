@@ -10,3 +10,4 @@ import { RedisModule } from '../redis/redis.module';
     exports: [HealthService],
 })
 export class HealthModule {}
+
