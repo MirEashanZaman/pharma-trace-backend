@@ -94,7 +94,6 @@ export class BlockchainService implements OnModuleInit {
         }
     }
 
-    
     private formatBytes32(hash: string): string {
         if (hash.startsWith('0x') && hash.length === 66) {
             return hash;
@@ -103,7 +102,6 @@ export class BlockchainService implements OnModuleInit {
         return '0x' + clean.padEnd(64, '0').slice(0, 64);
     }
 
-    
     async anchorAttestation(
         dataHash: string,
         drugSerialNumber: string,
@@ -115,7 +113,6 @@ export class BlockchainService implements OnModuleInit {
         let txHash: string | undefined;
         let blockNumber: number | undefined;
 
-        
         if (this.contract) {
             try {
                 const tx = await this.contract.registerAttestation(
@@ -127,7 +124,7 @@ export class BlockchainService implements OnModuleInit {
                 const receipt = await tx.wait();
                 txHash = receipt.hash;
                 blockNumber = receipt.blockNumber;
-                this.logger.log(` Anchored attestation on-chain: ${txHash}`);
+                this.logger.log(`Anchored attestation on-chain: ${txHash}`);
             } catch (err: any) {
                 this.logger.error(`Failed to register on-chain attestation: ${err.message}`);
             }
@@ -153,7 +150,6 @@ export class BlockchainService implements OnModuleInit {
         return anchor;
     }
 
-    
     async verifyAttestation(dataHash: string): Promise<VerifyAttestationResult> {
         const bytes32Hash = this.formatBytes32(dataHash);
 
@@ -206,13 +202,11 @@ export class BlockchainService implements OnModuleInit {
         };
     }
 
-    
     getDrugAttestations(drugSerialNumber: string): AttestationAnchor[] {
         const hashes = this.drugHistoryIndex.get(drugSerialNumber) || [];
         return hashes.map((h) => this.localAttestations.get(h)!).filter(Boolean);
     }
 
-    
     tamperAttestation(dataHash: string): boolean {
         const bytes32Hash = this.formatBytes32(dataHash);
         const record = this.localAttestations.get(bytes32Hash);
@@ -221,7 +215,6 @@ export class BlockchainService implements OnModuleInit {
         return true;
     }
 
-    
     verifyWalletSignature(message: string, signature: string, expectedAddress: string): boolean {
         try {
             const recoveredAddress = ethers.verifyMessage(message, signature);
@@ -317,6 +310,157 @@ export class BlockchainService implements OnModuleInit {
             }
         }
         return false;
+    }
+
+    async mintUnitTwinOnChain(
+        to: string,
+        gtin: string,
+        batchNumber: string,
+        serialNumber: string,
+        expirationDate: number,
+        ipfsCid: string = '',
+    ): Promise<{ tokenId?: string; transactionHash?: string; success: boolean }> {
+        if (this.digitalTwinContract) {
+            try {
+                const tx = await this.digitalTwinContract.mintTwin(
+                    to,
+                    gtin,
+                    batchNumber,
+                    serialNumber,
+                    expirationDate,
+                    ipfsCid,
+                );
+                const receipt = await tx.wait();
+                return {
+                    transactionHash: receipt.hash,
+                    success: true,
+                };
+            } catch (err: any) {
+                this.logger.error(`Failed to mint unit twin on-chain: ${err.message}`);
+            }
+        }
+        return { success: false };
+    }
+
+    async mintBatchTwinOnChain(
+        to: string,
+        gtin: string,
+        batchNumber: string,
+        totalQuantity: number,
+        expirationDate: number,
+        ipfsCid: string = '',
+    ): Promise<{ batchTokenId?: string; transactionHash?: string; success: boolean }> {
+        if (this.digitalTwinContract) {
+            try {
+                const tx = await this.digitalTwinContract.mintBatchTwin(
+                    to,
+                    gtin,
+                    batchNumber,
+                    totalQuantity,
+                    expirationDate,
+                    ipfsCid,
+                );
+                const receipt = await tx.wait();
+                return {
+                    transactionHash: receipt.hash,
+                    success: true,
+                };
+            } catch (err: any) {
+                this.logger.error(`Failed to mint batch twin on-chain: ${err.message}`);
+            }
+        }
+        return { success: false };
+    }
+
+    async burnTwinOnDispenseOnChain(
+        serialNumber: string,
+        dispenserAddress: string,
+    ): Promise<{ transactionHash?: string; success: boolean }> {
+        if (this.digitalTwinContract) {
+            try {
+                const tx = await this.digitalTwinContract.burnOnDispense(serialNumber, dispenserAddress);
+                const receipt = await tx.wait();
+                return {
+                    transactionHash: receipt.hash,
+                    success: true,
+                };
+            } catch (err: any) {
+                this.logger.error(`Failed to burn twin on-chain: ${err.message}`);
+            }
+        }
+        return { success: false };
+    }
+
+    async verifyTwinAuthenticityOnChain(
+        serialNumber: string,
+    ): Promise<{ exists: boolean; isAuthentic: boolean; isBurned: boolean; status: number; holder: string }> {
+        if (this.digitalTwinContract) {
+            try {
+                const res = await this.digitalTwinContract.verifyAuthenticity(serialNumber);
+                return {
+                    exists: res[0],
+                    isAuthentic: res[1],
+                    isBurned: res[2],
+                    status: Number(res[3]),
+                    holder: res[4],
+                };
+            } catch (err: any) {
+                this.logger.warn(`On-chain twin verification query failed: ${err.message}`);
+            }
+        }
+        return { exists: false, isAuthentic: false, isBurned: false, status: 0, holder: ethers.ZeroAddress };
+    }
+
+    async verifySoulboundAccreditation(
+        tokenId: string,
+    ): Promise<{ exists: boolean; isValid: boolean; recipient: string; issuer: string; isLocked: boolean }> {
+        if (this.contract) {
+            try {
+                const bytes32Token = this.formatBytes32(tokenId);
+                const res = await this.contract.verifyAccreditation(bytes32Token);
+                const isLocked = await this.contract.locked(bytes32Token);
+                return {
+                    exists: res.exists,
+                    isValid: res.isValid,
+                    recipient: res.recipient,
+                    issuer: res.issuer,
+                    isLocked,
+                };
+            } catch (err: any) {
+                this.logger.warn(`On-chain soulbound accreditation query failed: ${err.message}`);
+            }
+        }
+        return { exists: false, isValid: false, recipient: ethers.ZeroAddress, issuer: ethers.ZeroAddress, isLocked: false };
+    }
+
+    async slashBondWithConsensusOnChain(
+        shipmentId: string,
+        slashPercentage: number,
+        excursionReason: string,
+        consensusReportHash: string,
+        signatures: string[],
+    ): Promise<{ transactionHash?: string; success: boolean }> {
+        if (this.carrierStakingContract) {
+            try {
+                const bytes32Shipment = this.formatBytes32(shipmentId);
+                const bytes32Report = this.formatBytes32(consensusReportHash);
+                const tx = await this.carrierStakingContract.slashBondWithConsensus(
+                    bytes32Shipment,
+                    slashPercentage,
+                    excursionReason,
+                    bytes32Report,
+                    signatures,
+                );
+                const receipt = await tx.wait();
+                return {
+                    transactionHash: receipt.hash,
+                    success: true,
+                };
+            } catch (err: any) {
+                this.logger.error(`Failed to slash bond with consensus on-chain: ${err.message}`);
+            }
+        }
+        return { success: false };
     }
 
     getAttestationContract(): ethers.Contract | null {
