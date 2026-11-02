@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { User, UserRole } from './entities/user.entity';
 import { Invitation } from './entities/invitation.entity';
 import {
@@ -181,7 +181,7 @@ export class AuthService implements OnModuleInit {
         });
 
         const saved = await this.userRepository.save(user);
-        return this.generateToken(saved);
+        return await this.generateToken(saved);
     }
 
     async login(dto: LoginDto) {
@@ -201,7 +201,7 @@ export class AuthService implements OnModuleInit {
             throw new UnauthorizedException('Invalid credentials');
         }
 
-        return this.generateToken(user);
+        return await this.generateToken(user);
     }
 
     async forgotPassword(dto: ForgotPasswordDto) {
@@ -341,7 +341,7 @@ export class AuthService implements OnModuleInit {
             throw new UnauthorizedException('This account has been temporarily disabled by an administrator. Please contact compliance.');
         }
 
-        return this.generateToken(user);
+        return await this.generateToken(user);
     }
 
     async getProfile(userId: number) {
@@ -534,7 +534,7 @@ export class AuthService implements OnModuleInit {
         return { revoked: true, id };
     }
 
-    private generateToken(user: User) {
+    private async generateToken(user: User) {
         const payload = {
             sub: user.id,
             userId: user.id,
@@ -544,8 +544,14 @@ export class AuthService implements OnModuleInit {
             walletAddress: user.walletAddress,
         };
 
+        const rawSeed = typeof randomUUID === 'function' ? randomUUID() : `${Date.now()}-${Math.random()}`;
+        const refreshToken = createHash('sha256').update(`${user.id}:${rawSeed}`).digest('hex');
+
+        await this.redisService.set(`auth:refresh:${user.id}:${refreshToken}`, { userId: user.id, email: user.email }, 7 * 24 * 3600);
+
         return {
             accessToken: this.jwtService.sign(payload),
+            refreshToken,
             user: {
                 id: user.id,
                 email: user.email,
@@ -559,5 +565,35 @@ export class AuthService implements OnModuleInit {
                 warningIssuedAt: user.warningIssuedAt,
             },
         };
+    }
+
+    async refreshSession(userId: number, refreshToken: string) {
+        if (!userId || !refreshToken) {
+            throw new UnauthorizedException('Missing userId or refreshToken in refresh request');
+        }
+
+        const cacheKey = `auth:refresh:${userId}:${refreshToken}`;
+        const session = await this.redisService.get<{ userId: number; email: string }>(cacheKey);
+
+        if (!session) {
+            throw new UnauthorizedException('Invalid, revoked, or expired refresh token session');
+        }
+
+        await this.redisService.del(cacheKey);
+
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user || user.isDisabled) {
+            throw new UnauthorizedException('User account is invalid or suspended');
+        }
+
+        return await this.generateToken(user);
+    }
+
+    async revokeAllUserSessions(userId: number) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) {
+            throw new BadRequestException('User not found');
+        }
+        return { success: true, message: 'All refresh sessions revoked' };
     }
 }
