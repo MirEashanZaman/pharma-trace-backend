@@ -1,0 +1,390 @@
+{
+  "contractName": "PharmaCrossChainBridge",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_digitalTwin",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ReentrancyGuardReentrantCall",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "messageId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint64",
+          "name": "sourceChainSelector",
+          "type": "uint64"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newTokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "serialNumber",
+          "type": "string"
+        }
+      ],
+      "name": "InboundTwinReceived",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "messageId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint64",
+          "name": "destinationChainSelector",
+          "type": "uint64"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "receiver",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "serialNumber",
+          "type": "string"
+        }
+      ],
+      "name": "OutboundTwinBridged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "authorizedRelayers",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "destinationChainSelector",
+          "type": "uint64"
+        },
+        {
+          "internalType": "address",
+          "name": "receiver",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "serialNumber",
+          "type": "string"
+        }
+      ],
+      "name": "bridgeOutbound",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "digitalTwinContract",
+      "outputs": [
+        {
+          "internalType": "contract IPharmaDigitalTwin",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "name": "processedMessageIds",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "messageId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint64",
+          "name": "sourceChainSelector",
+          "type": "uint64"
+        },
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "gtin",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "batchNumber",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "serialNumber",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "expirationDate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "ipfsDossierCid",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "recipient",
+              "type": "address"
+            }
+          ],
+          "internalType": "struct PharmaCrossChainBridge.InboundTwinPayload",
+          "name": "payload",
+          "type": "tuple"
+        }
+      ],
+      "name": "relayInboundMessage",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "relayer",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "authorized",
+          "type": "bool"
+        }
+      ],
+      "name": "setAuthorizedRelayer",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_digitalTwin",
+          "type": "address"
+        }
+      ],
+      "name": "setDigitalTwin",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "chainSelector",
+          "type": "uint64"
+        },
+        {
+          "internalType": "bool",
+          "name": "supported",
+          "type": "bool"
+        }
+      ],
+      "name": "setSupportedChain",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "",
+          "type": "uint64"
+        }
+      ],
+      "name": "supportedChainSelectors",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "60803461015457601f610c4c38819003918201601f19168301916001600160401b038311848410176101585780849260209460405283398101031261015457516001600160a01b03811690819003610154573315610141575f8054336001600160a01b03198216811783556040519290916001600160a01b0316907f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09080a360017f9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f005581156100ff575060018060a01b03196001541617600155335f52600460205260405f20600160ff19825416179055604051610adf908161016d8239f35b62461bcd60e51b815260206004820152601c60248201527f496e76616c6964206469676974616c207477696e2061646472657373000000006044820152606490fd5b631e4fbdf760e01b5f525f60045260245ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe60806040526004361015610011575f80fd5b5f803560e01c80631fdd3fc11461063057806329e295c5146105f35780632c5fa06f146105c457806361c85aa31461059c578063715018a6146105455780638da5cb5b1461051e5780639011e5f91461048b578063b4254e6a1461044d578063d72e069014610200578063f2fde38b1461017a578063f5b5b804146101235763f6dbb8311461009e575f80fd5b34610120576020366003190112610120576100b7610963565b6100bf610a83565b6001600160a01b031680156100e9576bffffffffffffffffffffffff60a01b600154161760015580f35b60405162461bcd60e51b815260206004820152600f60248201526e496e76616c6964206164647265737360881b6044820152606490fd5b80fd5b50346101205760403660031901126101205761017761014061094c565b67ffffffffffffffff610151610979565b9161015a610a83565b1683526002602052604083209060ff801983541691151516179055565b80f35b503461012057602036600319011261012057610194610963565b61019c610a83565b6001600160a01b031680156101ec5781546001600160a01b03198116821783556001600160a01b03167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e08380a380f35b631e4fbdf760e01b82526004829052602482fd5b346103bd5760803660031901126103bd5761021961094c565b6024356001600160a01b03811691908290036103bd576044359060643567ffffffffffffffff81116103bd57366023820112156103bd5780600401359167ffffffffffffffff83116103bd5736602484840101116103bd5767ffffffffffffffff90610283610a25565b1690815f52600260205260ff60405f205416156103f95784156103c1576001546001600160a01b031693843b156103bd575f8095606460405180988193631322b8cb60e11b83523360048401523060248401528660448401525af19081156103b257602096610373967ffd26654a9bc434dd75f238df5298b8a5e7a1b31f6bd7f59e2a332479fe8ebef2936103a2575b50604051888101904682528660408201528360608201523360808201528260a08201524260c082015260c0815261034b60e0826109cf565b51902096879460405193849384528a8401526060604084015233976024606085019201610a05565b0390a460017f9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f0055604051908152f35b5f6103ac916109cf565b5f610313565b6040513d5f823e3d90fd5b5f80fd5b60405162461bcd60e51b815260206004820152601060248201526f24b73b30b634b2103932b1b2b4bb32b960811b6044820152606490fd5b60405162461bcd60e51b815260206004820152602660248201527f556e737570706f727465642064657374696e6174696f6e20636861696e2073656044820152653632b1ba37b960d11b6064820152608490fd5b346103bd5760203660031901126103bd5767ffffffffffffffff61046f61094c565b165f526002602052602060ff60405f2054166040519015158152f35b346103bd5760403660031901126103bd576104a4610963565b6104ac610979565b906104b5610a83565b6001600160a01b03169081156104e7576104e5915f52600460205260405f209060ff801983541691151516179055565b005b60405162461bcd60e51b815260206004820152600f60248201526e24b73b30b634b2103932b630bcb2b960891b6044820152606490fd5b346103bd575f3660031901126103bd575f546040516001600160a01b039091168152602090f35b346103bd575f3660031901126103bd5761055d610a83565b5f80546001600160a01b0319811682556001600160a01b03167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e08280a3005b346103bd575f3660031901126103bd576001546040516001600160a01b039091168152602090f35b346103bd5760203660031901126103bd576004355f526003602052602060ff60405f2054166040519015158152f35b346103bd5760203660031901126103bd576001600160a01b03610614610963565b165f526004602052602060ff60405f2054166040519015158152f35b346103bd5760603660031901126103bd5760043560243567ffffffffffffffff81168091036103bd576044359067ffffffffffffffff82116103bd57816004019060c060031984360301126103bd57610687610a25565b335f52600460205260ff60405f205416156108f457835f52600360205260ff60405f2054166108af5760a48301936001600160a01b036106c686610988565b161561086a575f818152600360205260409020805460ff19166001908117909155546001600160a01b0316936106fb86610988565b94610706858061099c565b9096610715602485018861099c565b90946044810195610726878b61099c565b610733608485018d61099c565b604051631516ca4560e21b81526001600160a01b03909816600489015260c06024890152969d8e9889989297929592916107719160c48b0191610a05565b906003198983030160448a015261078792610a05565b9060031987830301606488015261079d92610a05565b916064013560848501526003198483030160a48501526107bc92610a05565b03815a6020945f91f19485156103b2575f95610832575b5061080a7f4f45c5bf0f7e05e0c88141369428c4d93b68095eae59ec0c6f2e47ec3405875691610804602098610988565b9561099c565b604080518881528981018290526001600160a01b039097169692839261037392840191610a05565b9594506020863d602011610862575b8161084e602093836109cf565b810103126103bd579451939461080a6107d3565b3d9150610841565b60405162461bcd60e51b815260206004820152601960248201527f496e76616c6964207061796c6f616420726563697069656e74000000000000006044820152606490fd5b60405162461bcd60e51b815260206004820152601960248201527f4d65737361676520616c72656164792070726f636573736564000000000000006044820152606490fd5b60405162461bcd60e51b815260206004820152602a60248201527f43616c6c6572206973206e6f7420616e20617574686f72697a6564206272696460448201526933b2903932b630bcb2b960b11b6064820152608490fd5b6004359067ffffffffffffffff821682036103bd57565b600435906001600160a01b03821682036103bd57565b6024359081151582036103bd57565b356001600160a01b03811681036103bd5790565b903590601e19813603018212156103bd570180359067ffffffffffffffff82116103bd576020019181360383136103bd57565b90601f8019910116810190811067ffffffffffffffff8211176109f157604052565b634e487b7160e01b5f52604160045260245ffd5b908060209392818452848401375f828201840152601f01601f1916010190565b60027f9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f005414610a745760027f9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f0055565b633ee5aeb560e01b5f5260045ffd5b5f546001600160a01b03163303610a9657565b63118cdaa760e01b5f523360045260245ffdfea2646970667358221220a861e43aca9b29c23fd38ce78a417a31cd135e9a061943f0e5eb73dd945690b564736f6c634300081a0033"
+}
