@@ -6,8 +6,10 @@ import { json, urlencoded } from 'express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AuditLoggingInterceptor } from './common/interceptors/audit-logging.interceptor';
+import { validateEnvironment } from './common/config/env.validation';
 
 async function bootstrap() {
+  validateEnvironment();
   const app = await NestFactory.create(AppModule);
 
   app.use(
