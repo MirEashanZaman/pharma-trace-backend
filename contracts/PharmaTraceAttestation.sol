@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
-contract PharmaTraceAttestation {
+interface IERC5192 {
+    event Locked(uint256 tokenId);
+    event Unlocked(uint256 tokenId);
+    function locked(uint256 tokenId) external view returns (bool);
+}
+
+contract PharmaTraceAttestation is IERC5192 {
     bytes32 public constant REGULATOR_ROLE = keccak256("REGULATOR_ROLE");
     bytes32 public constant MANUFACTURER_ROLE = keccak256("MANUFACTURER_ROLE");
     bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
@@ -414,6 +420,7 @@ contract PharmaTraceAttestation {
             metadataCid
         );
         emit Locked(tokenId);
+        emit IERC5192.Locked(uint256(tokenId));
 
         return tokenId;
     }
@@ -467,6 +474,16 @@ contract PharmaTraceAttestation {
         Accreditation memory record = accreditations[tokenId];
         require(record.issuedAt > 0, "Accreditation not found");
         return record.locked;
+    }
+
+    function locked(uint256 tokenId) external view override returns (bool) {
+        Accreditation memory record = accreditations[bytes32(tokenId)];
+        require(record.issuedAt > 0, "Accreditation not found");
+        return record.locked;
+    }
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == 0x01ffc9a7 || interfaceId == type(IERC5192).interfaceId;
     }
 
     function getHolderAccreditations(address holder) external view returns (bytes32[] memory) {
