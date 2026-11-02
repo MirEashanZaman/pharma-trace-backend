@@ -45,6 +45,18 @@ export class AuthController {
         return this.authService.login(dto);
     }
 
+    @Post('refresh')
+    refreshSession(@Body() body: { userId: number; refreshToken: string }) {
+        return this.authService.refreshSession(Number(body?.userId), String(body?.refreshToken || ''));
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('revoke-sessions')
+    revokeSessions(@Request() req: any) {
+        const rawId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
+        return this.authService.revokeAllUserSessions(Number(rawId));
+    }
+
     @Post('web3-login')
     web3Login(@Body() dto: Web3LoginDto) {
         return this.authService.web3Login(dto);
