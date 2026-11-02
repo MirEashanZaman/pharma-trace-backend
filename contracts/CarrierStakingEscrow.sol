@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 contract CarrierStakingEscrow is ReentrancyGuard {
     using SafeERC20 for IERC20;
+    using ECDSA for bytes32;
 
     address public owner;
     IERC20 public immutable stakingToken;
@@ -37,11 +40,18 @@ contract CarrierStakingEscrow is ReentrancyGuard {
     bytes32[] public activeBondIds;
     mapping(bytes32 => uint256) private activeBondIdIndex;
 
+    mapping(address => bool) public isAuthorizedOracle;
+    uint256 public oracleCount;
+    uint256 public consensusThreshold;
+
     event CarrierStaked(address indexed carrier, uint256 amount, uint256 newTotalStake);
     event CarrierUnstaked(address indexed carrier, uint256 amount, uint256 remainingStake);
     event BondLocked(bytes32 indexed shipmentId, address indexed carrier, address indexed manufacturer, uint256 bondAmount);
     event BondReleased(bytes32 indexed shipmentId, address indexed carrier, uint256 bondAmount);
     event BondSlashed(bytes32 indexed shipmentId, address indexed carrier, address indexed manufacturer, uint256 slashedAmount, string excursionReason, bytes32 consensusReportHash);
+    event OracleAdded(address indexed oracle);
+    event OracleRemoved(address indexed oracle);
+    event ConsensusThresholdUpdated(uint256 newThreshold);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner authorized");
@@ -51,6 +61,31 @@ contract CarrierStakingEscrow is ReentrancyGuard {
     constructor(address _stakingToken) {
         owner = msg.sender;
         stakingToken = IERC20(_stakingToken);
+        isAuthorizedOracle[msg.sender] = true;
+        oracleCount = 1;
+        consensusThreshold = 1;
+    }
+
+    function addOracle(address oracle) external onlyOwner {
+        require(oracle != address(0), "Invalid oracle address");
+        require(!isAuthorizedOracle[oracle], "Oracle already authorized");
+        isAuthorizedOracle[oracle] = true;
+        oracleCount += 1;
+        emit OracleAdded(oracle);
+    }
+
+    function removeOracle(address oracle) external onlyOwner {
+        require(isAuthorizedOracle[oracle], "Oracle not authorized");
+        require(oracleCount > consensusThreshold, "Cannot reduce oracle count below threshold");
+        isAuthorizedOracle[oracle] = false;
+        oracleCount -= 1;
+        emit OracleRemoved(oracle);
+    }
+
+    function setConsensusThreshold(uint256 threshold) external onlyOwner {
+        require(threshold > 0 && threshold <= oracleCount, "Invalid consensus threshold");
+        consensusThreshold = threshold;
+        emit ConsensusThresholdUpdated(threshold);
     }
 
     function _removeActiveBond(bytes32 shipmentId) internal {
@@ -140,6 +175,48 @@ contract CarrierStakingEscrow is ReentrancyGuard {
         string calldata excursionReason,
         bytes32 consensusReportHash
     ) external onlyOwner nonReentrant {
+        _executeSlash(shipmentId, slashPercentage, excursionReason, consensusReportHash);
+    }
+
+    function slashBondWithConsensus(
+        bytes32 shipmentId,
+        uint256 slashPercentage,
+        string calldata excursionReason,
+        bytes32 consensusReportHash,
+        bytes[] calldata signatures
+    ) external nonReentrant {
+        require(signatures.length >= consensusThreshold, "Insufficient oracle signatures for consensus");
+
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                block.chainid,
+                address(this),
+                shipmentId,
+                slashPercentage,
+                consensusReportHash
+            )
+        );
+        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+
+        address[] memory verifiedSigners = new address[](signatures.length);
+        for (uint256 i = 0; i < signatures.length; i++) {
+            address signer = ECDSA.recover(ethSignedMessageHash, signatures[i]);
+            require(isAuthorizedOracle[signer], "Signature signer is not an authorized oracle");
+            for (uint256 j = 0; j < i; j++) {
+                require(verifiedSigners[j] != signer, "Duplicate oracle signature detected");
+            }
+            verifiedSigners[i] = signer;
+        }
+
+        _executeSlash(shipmentId, slashPercentage, excursionReason, consensusReportHash);
+    }
+
+    function _executeSlash(
+        bytes32 shipmentId,
+        uint256 slashPercentage,
+        string calldata excursionReason,
+        bytes32 consensusReportHash
+    ) internal {
         require(slashPercentage > 0 && slashPercentage <= 100, "Invalid slash percentage");
         ShipmentBond storage bond = bonds[shipmentId];
         require(bond.status == BondStatus.LOCKED, "Bond is not locked");
