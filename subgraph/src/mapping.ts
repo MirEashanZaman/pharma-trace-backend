@@ -196,6 +196,7 @@ export function handleAccreditationIssued(event: AccreditationIssued): void {
   acc.validUntil = event.params.validUntil;
   acc.metadataCid = sanitizeString(event.params.metadataCid, 128);
   acc.isRevoked = false;
+  acc.isLocked = true;
   acc.issuedAt = event.block.timestamp;
   acc.blockNumber = event.block.number;
   acc.transactionHash = event.transaction.hash;
