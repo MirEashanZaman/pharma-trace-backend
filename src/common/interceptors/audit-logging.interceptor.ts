@@ -22,13 +22,25 @@ export interface AuditRecord {
   clientIp: string;
   status: 'SUCCESS' | 'ERROR';
   errorMessage?: string;
+  previousHash: string;
   hash: string;
 }
+
+export interface AuditChainIntegrityResult {
+  isValid: boolean;
+  brokenAtRecordId: string | null;
+  totalVerified: number;
+  genesisHash: string;
+  headHash: string;
+}
+
+const GENESIS_AUDIT_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
 
 @Injectable()
 export class AuditLoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('ComplianceAudit');
   private static readonly records: AuditRecord[] = [];
+  private static lastHash: string = GENESIS_AUDIT_HASH;
 
   static getAuditRecords(limit = 100, role?: string, method?: string): AuditRecord[] {
     let list = [...AuditLoggingInterceptor.records];
@@ -41,8 +53,62 @@ export class AuditLoggingInterceptor implements NestInterceptor {
     return list.slice(-limit).reverse();
   }
 
+  static verifyChainIntegrity(): AuditChainIntegrityResult {
+    const list = AuditLoggingInterceptor.records;
+    if (list.length === 0) {
+      return {
+        isValid: true,
+        brokenAtRecordId: null,
+        totalVerified: 0,
+        genesisHash: GENESIS_AUDIT_HASH,
+        headHash: GENESIS_AUDIT_HASH,
+      };
+    }
+
+    let expectedPrev = list[0].previousHash;
+
+    for (let i = 0; i < list.length; i++) {
+      const rec = list[i];
+      if (rec.previousHash !== expectedPrev) {
+        return {
+          isValid: false,
+          brokenAtRecordId: rec.id,
+          totalVerified: i,
+          genesisHash: GENESIS_AUDIT_HASH,
+          headHash: AuditLoggingInterceptor.lastHash,
+        };
+      }
+
+      const suffix = rec.status === 'ERROR' ? ':ERR' : '';
+      const calculated = createHash('sha256')
+        .update(`${rec.previousHash}:${rec.timestamp}:${rec.method}:${rec.endpoint}:${rec.statusCode}:${rec.callerId}${suffix}`)
+        .digest('hex');
+
+      if (calculated !== rec.hash) {
+        return {
+          isValid: false,
+          brokenAtRecordId: rec.id,
+          totalVerified: i,
+          genesisHash: GENESIS_AUDIT_HASH,
+          headHash: AuditLoggingInterceptor.lastHash,
+        };
+      }
+
+      expectedPrev = rec.hash;
+    }
+
+    return {
+      isValid: true,
+      brokenAtRecordId: null,
+      totalVerified: list.length,
+      genesisHash: GENESIS_AUDIT_HASH,
+      headHash: AuditLoggingInterceptor.lastHash,
+    };
+  }
+
   static clearAuditRecords(): void {
     AuditLoggingInterceptor.records.length = 0;
+    AuditLoggingInterceptor.lastHash = GENESIS_AUDIT_HASH;
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
@@ -63,9 +129,11 @@ export class AuditLoggingInterceptor implements NestInterceptor {
           const statusCode = res.statusCode;
           res.setHeader('X-Response-Time', `${duration}ms`);
           const timestamp = new Date().toISOString();
+          const prev = AuditLoggingInterceptor.lastHash;
           const hash = createHash('sha256')
-            .update(`${timestamp}:${method}:${originalUrl}:${statusCode}:${callerId}`)
+            .update(`${prev}:${timestamp}:${method}:${originalUrl}:${statusCode}:${callerId}`)
             .digest('hex');
+          AuditLoggingInterceptor.lastHash = hash;
 
           const record: AuditRecord = {
             id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -78,6 +146,7 @@ export class AuditLoggingInterceptor implements NestInterceptor {
             callerRole,
             clientIp: ip || '127.0.0.1',
             status: 'SUCCESS',
+            previousHash: prev,
             hash,
           };
 
@@ -94,9 +163,11 @@ export class AuditLoggingInterceptor implements NestInterceptor {
           const duration = Date.now() - startTime;
           const statusCode = err?.status || err?.statusCode || 500;
           const timestamp = new Date().toISOString();
+          const prev = AuditLoggingInterceptor.lastHash;
           const hash = createHash('sha256')
-            .update(`${timestamp}:${method}:${originalUrl}:${statusCode}:${callerId}:ERR`)
+            .update(`${prev}:${timestamp}:${method}:${originalUrl}:${statusCode}:${callerId}:ERR`)
             .digest('hex');
+          AuditLoggingInterceptor.lastHash = hash;
 
           const record: AuditRecord = {
             id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -110,6 +181,7 @@ export class AuditLoggingInterceptor implements NestInterceptor {
             clientIp: ip || '127.0.0.1',
             status: 'ERROR',
             errorMessage: err?.message || 'Execution error',
+            previousHash: prev,
             hash,
           };
 
