@@ -94,6 +94,11 @@ export class ComplianceController {
     return AuditLoggingInterceptor.getAuditRecords(lim, role, method);
   }
 
+  @Get('audit/verify-chain')
+  verifyAuditChainIntegrity() {
+    return AuditLoggingInterceptor.verifyChainIntegrity();
+  }
+
   @Get('verify/:batchNumber/:digest')
   async verifyAttestation(
     @Param('batchNumber') batchNumber: string,
