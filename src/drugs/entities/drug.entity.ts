@@ -4,11 +4,19 @@ import {
     Column,
     CreateDateColumn,
     OneToMany,
+    Index,
 } from 'typeorm';
 
 import { DrugEvent } from '../../events/entities/drug-event.entity';
 
 @Entity('drugs')
+@Index(['batchNumber'])
+@Index(['manufacturer'])
+@Index(['currentCustodian'])
+@Index(['isRecalled'])
+@Index(['qcStatus'])
+@Index(['inboundInspectionStatus'])
+@Index(['pharmacyInboundStatus'])
 export class Drug {
     @PrimaryGeneratedColumn()
     id!: number;
