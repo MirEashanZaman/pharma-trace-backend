@@ -15,6 +15,7 @@ import { AuthModule } from './auth/auth.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { RedisModule } from './redis/redis.module';
 import { MailModule } from './mail/mail.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { MailModule } from './mail/mail.module';
     BlockchainModule,
     AuthModule,
     ComplianceModule,
+    HealthModule,
   ],
 
   controllers: [
