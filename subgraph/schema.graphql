@@ -77,7 +77,35 @@ type Accreditation @entity {
   validUntil: BigInt!
   metadataCid: String!
   isRevoked: Boolean!
+  isLocked: Boolean!
   issuedAt: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type CarrierBond @entity {
+  id: ID!
+  shipmentId: Bytes!
+  carrier: Bytes!
+  manufacturer: Bytes!
+  bondAmount: BigInt!
+  status: String!
+  lockedAt: BigInt!
+  resolvedAt: BigInt
+  resolutionReason: String
+  slashedAmount: BigInt
+  consensusReportHash: Bytes
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type ZkColdChainRecord @entity {
+  id: ID!
+  batchHash: Bytes!
+  isCompliant: Boolean!
+  minTemp: BigInt!
+  maxTemp: BigInt!
+  verifiedAt: BigInt!
   blockNumber: BigInt!
   transactionHash: Bytes!
 }
