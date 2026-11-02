@@ -77,6 +77,19 @@ async function main() {
     const paymasterAddress = await deployContract('PharmaPaymaster', deployer, [deployerAddress]);
     console.log(`PharmaPaymaster deployed: ${paymasterAddress}`);
 
+    const entryPointAddress = process.env.ENTRY_POINT_ADDRESS;
+    if (entryPointAddress) {
+        try {
+            const paymasterFactory = await hre.ethers.getContractFactory('PharmaPaymaster', deployer);
+            const paymasterContract = paymasterFactory.attach(paymasterAddress);
+            const epTx = await paymasterContract.setEntryPoint(entryPointAddress);
+            await epTx.wait();
+            console.log(`PharmaPaymaster entryPoint configured: ${entryPointAddress}`);
+        } catch (epErr) {
+            console.log(`PharmaPaymaster entryPoint configuration skipped: ${epErr.message}`);
+        }
+    }
+
     try {
         const fundTx = await deployer.sendTransaction({
             to: paymasterAddress,
