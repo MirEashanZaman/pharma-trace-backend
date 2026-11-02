@@ -22,6 +22,8 @@ dataSources:
       eventHandlers:
         - event: ItemMinted(indexed uint256,indexed string,indexed address,string,string)
           handler: handleItemMinted
+        - event: BatchTwinMinted(indexed uint256,indexed string,indexed address,uint256)
+          handler: handleBatchTwinMinted
         - event: CustodyTransferred(indexed uint256,indexed address,indexed address,uint256)
           handler: handleCustodyTransferred
         - event: ItemBurnedOnDispense(indexed uint256,indexed string,indexed address,uint256)
@@ -82,4 +84,52 @@ dataSources:
           handler: handleBatchAnchored
         - event: AccreditationIssued(indexed bytes32,indexed address,indexed address,string,string,uint256,string)
           handler: handleAccreditationIssued
+        - event: Locked(indexed bytes32)
+          handler: handleAccreditationLocked
+      file: ./src/mapping.ts
+
+  - kind: ethereum
+    name: CarrierStakingEscrow
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: CarrierStakingEscrow
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - CarrierBond
+      abis:
+        - name: CarrierStakingEscrow
+          file: ../src/blockchain/artifacts/CarrierStakingEscrow.json
+      eventHandlers:
+        - event: BondLocked(indexed bytes32,indexed address,indexed address,uint256)
+          handler: handleBondLocked
+        - event: BondReleased(indexed bytes32,indexed address,uint256)
+          handler: handleBondReleased
+        - event: BondSlashed(indexed bytes32,indexed address,indexed address,uint256,string,bytes32)
+          handler: handleBondSlashed
+      file: ./src/mapping.ts
+
+  - kind: ethereum
+    name: ZkColdChainVerifier
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: ZkColdChainVerifier
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - ZkColdChainRecord
+      abis:
+        - name: ZkColdChainVerifier
+          file: ../src/blockchain/artifacts/ZkColdChainVerifier.json
+      eventHandlers:
+        - event: ProofVerified(indexed bytes32,indexed bool,uint256,uint256,uint256)
+          handler: handleProofVerified
       file: ./src/mapping.ts
