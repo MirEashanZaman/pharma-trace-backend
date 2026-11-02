@@ -4,12 +4,15 @@ import {
     Column,
     CreateDateColumn,
     ManyToOne,
+    Index,
 } from 'typeorm';
 
 import { Drug } from '../../drugs/entities/drug.entity';
 import { EventType } from '../event-type.enum';
 
 @Entity('drug_events')
+@Index(['drugSerialNumber', 'createdAt'])
+@Index(['eventType'])
 export class DrugEvent {
     @PrimaryGeneratedColumn()
     id!: number;
