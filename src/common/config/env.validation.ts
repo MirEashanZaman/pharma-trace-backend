@@ -26,7 +26,7 @@ export function validateEnvironment(env: Record<string, unknown> = process.env):
     const result = envSchema.safeParse(env);
 
     if (!result.success) {
-        const errors = result.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
+        const errors = (result.error.issues || []).map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
         logger.error(`Critical environment variable validation failure: ${errors}`);
         throw new Error(`Environment validation failed: ${errors}`);
     }
