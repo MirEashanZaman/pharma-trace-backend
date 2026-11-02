@@ -22,6 +22,7 @@ const input = {
       enabled: true,
       runs: 200,
     },
+    viaIR: true,
     outputSelection: {
       '*': {
         '*': ['abi', 'evm.bytecode'],
