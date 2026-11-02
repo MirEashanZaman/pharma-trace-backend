@@ -1,4 +1,4 @@
-﻿FROM node:20-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -6,6 +6,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+RUN npm run compile:contract
 RUN npm run build
 
 FROM node:20-alpine AS runner
@@ -21,6 +22,10 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/contracts ./contracts
 COPY --from=builder /app/scripts ./scripts
 
+RUN chown -R node:node /app
+
+USER node
+
 EXPOSE 3500
 
-CMD [node, dist/main]
+CMD ["node", "dist/main"]
