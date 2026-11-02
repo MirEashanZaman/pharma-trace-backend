@@ -101,4 +101,33 @@ export class IpfsService {
         record.dossier.metadataName = name;
         return record.dossier;
     }
+
+    async packageComplianceDossier(
+        batchNumber: string,
+        gtin: string,
+        coaData: Record<string, any>,
+        epiData: Record<string, any>,
+        digitalSignature: string,
+        signerAddress: string,
+    ): Promise<{ cid: string; dossier: IpfsPinnedDossier; manifestUri: string }> {
+        const canonicalPayload = {
+            standard: '21-CFR-PART-11-EU-GMP-ANNEX-11',
+            gtin,
+            batchNumber,
+            certificateOfAnalysis: coaData,
+            electronicProductInformation: epiData,
+            attestation: {
+                signerAddress,
+                signature: digitalSignature,
+                timestamp: Date.now(),
+            },
+        };
+
+        const dossier = await this.pinJson(canonicalPayload, `dossier-${gtin}-${batchNumber}`);
+        return {
+            cid: dossier.cid,
+            dossier,
+            manifestUri: dossier.gatewayUrl,
+        };
+    }
 }
