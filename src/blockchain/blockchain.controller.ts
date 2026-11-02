@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 import { IsString, IsNotEmpty, IsOptional, MaxLength } from 'class-validator';
 import { BlockchainService } from './blockchain.service';
+import { BatchAttestationEngine } from './merkle/batch-attestation.engine';
+import { MerkleTree } from './merkle/merkle-tree';
 import { IpfsService } from './ipfs/ipfs.service';
 import { ZkProofEngine } from './zk/zk-proof.engine';
 import { PaymasterService } from './account-abstraction/paymaster.service';
@@ -76,6 +78,7 @@ export class BlockchainController {
         private readonly didResolverService: DidResolverService,
         private readonly epcisJsonLdService: EpcisJsonLdService,
         private readonly bundlerService: BundlerService,
+        private readonly batchAttestationEngine: BatchAttestationEngine,
     ) {}
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -351,6 +354,56 @@ export class BlockchainController {
     @Post('escrow/automation/poll')
     pollEscrowAutomation() {
         return this.escrowService.pollAndExecuteUpkeep();
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.MANUFACTURER, UserRole.ADMIN)
+    @Post('batch/create')
+    async createBatchRollup(@Body() body: { items: any[] }) {
+        const batch = this.batchAttestationEngine.createBatch(body.items);
+        const onChainResult = await this.blockchainService.anchorBatchOnChain(
+            batch.merkleRoot,
+            batch.batchSize,
+            batch.ipfsCid,
+        );
+        return {
+            ...batch,
+            onChainAnchored: onChainResult.success,
+            transactionHash: onChainResult.transactionHash,
+            blockNumber: onChainResult.blockNumber,
+        };
+    }
+
+    @Get('batch/proof/:batchId/:serialNumber')
+    getBatchProof(
+        @Param('batchId') batchId: string,
+        @Param('serialNumber') serialNumber: string,
+        @Query('eventType') eventType: string = 'PRODUCTION_RELEASE',
+    ) {
+        return this.batchAttestationEngine.getProofForItem(batchId, {
+            serialNumber,
+            eventType,
+            dataHash: '',
+            timestamp: 0,
+        });
+    }
+
+    @Post('batch/verify-inclusion')
+    async verifyBatchInclusion(
+        @Body() body: { leaf: string; proof: string[]; merkleRoot: string }
+    ) {
+        const offChainValid = MerkleTree.verifyProof(body.leaf, body.proof, body.merkleRoot);
+        const onChainValid = await this.blockchainService.verifyBatchInclusionOnChain(
+            body.leaf,
+            body.proof,
+            body.merkleRoot,
+        );
+        return {
+            valid: offChainValid,
+            onChainVerified: onChainValid,
+            leaf: body.leaf,
+            merkleRoot: body.merkleRoot,
+        };
     }
 }
 
