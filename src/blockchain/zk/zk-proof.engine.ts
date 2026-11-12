@@ -29,6 +29,8 @@ export interface ZkColdChainVerificationResult {
     readingsEvaluated: number;
     isCompliant: boolean;
     proofDigest: string;
+    nullifier?: string;
+    isReplay?: boolean;
     poseidonCommitment?: string;
 }
 
@@ -46,6 +48,19 @@ const BN128_R = 2188824287183927522224640574525727508854836440041603434369820418
 export class ZkProofEngine implements OnModuleInit {
     private readonly logger = new Logger(ZkProofEngine.name);
     private poseidonFn: any = null;
+    private readonly usedNullifiers: Set<string> = new Set();
+
+    isProofNullifierUsed(digest: string): boolean {
+        return this.usedNullifiers.has(digest);
+    }
+
+    markProofNullifierUsed(digest: string): void {
+        this.usedNullifiers.add(digest);
+    }
+
+    clearNullifiers(): void {
+        this.usedNullifiers.clear();
+    }
 
     async onModuleInit() {
         try {
@@ -251,13 +266,17 @@ export class ZkProofEngine implements OnModuleInit {
             toUtf8Bytes(`${proof.pi_a[0]}:${proof.pi_b[0][0]}:${proof.pi_c[0]}:${commitment || batchHash}`),
         );
 
+        const isReplay = this.usedNullifiers.has(proofDigest);
+
         return {
-            isValid: validCoords && isCompliant,
+            isValid: validCoords && isCompliant && !isReplay,
             batchHash,
             temperatureRange: { min, max },
             readingsEvaluated: readings,
             isCompliant,
             proofDigest,
+            nullifier: proofDigest,
+            isReplay,
             poseidonCommitment: commitment,
         };
     }
