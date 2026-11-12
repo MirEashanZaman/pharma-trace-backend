@@ -11,7 +11,7 @@ import {
     Param,
     Query,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
@@ -33,7 +33,7 @@ import { UserRole } from './entities/user.entity';
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
 
-    private setAuthCookies(res?: Response, accessToken?: string, refreshToken?: string) {
+    private setAuthCookies(res?: any, accessToken?: string, refreshToken?: string) {
         if (!res || typeof res.cookie !== 'function') return;
         const isProd = process.env.NODE_ENV === 'production';
         if (accessToken) {
@@ -63,7 +63,7 @@ export class AuthController {
 
     @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('register')
-    async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res?: Response) {
+    async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res?: any) {
         const result = await this.authService.register(dto);
         this.setAuthCookies(res, result.accessToken, result.refreshToken);
         return result;
@@ -71,31 +71,22 @@ export class AuthController {
 
     @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('login')
-    async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res?: Response) {
+    async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res?: any) {
         const result = await this.authService.login(dto);
         this.setAuthCookies(res, result.accessToken, result.refreshToken);
         return result;
     }
 
     @Post('refresh')
-    async refreshSession(@Body() body: { userId: number; refreshToken: string }, @Res({ passthrough: true }) res?: Response) {
+    async refreshSession(@Body() body: { userId: number; refreshToken: string }, @Res({ passthrough: true }) res?: any) {
         const result = await this.authService.refreshSession(Number(body?.userId), String(body?.refreshToken || ''));
         this.setAuthCookies(res, result.accessToken, result.refreshToken);
         return result;
     }
 
-    @Post('logout')
-    logout(@Res({ passthrough: true }) res?: Response) {
-        if (res && typeof res.clearCookie === 'function') {
-            res.clearCookie('pharma_access_token', { path: '/' });
-            res.clearCookie('pharma_refresh_token', { path: '/' });
-        }
-        return { success: true, message: 'Logged out successfully' };
-    }
-
     @UseGuards(JwtAuthGuard)
     @Post('revoke-sessions')
-    revokeSessions(@Request() req: any, @Res({ passthrough: true }) res?: Response) {
+    revokeSessions(@Request() req: any, @Res({ passthrough: true }) res?: any) {
         if (res && typeof res.clearCookie === 'function') {
             res.clearCookie('pharma_access_token', { path: '/' });
             res.clearCookie('pharma_refresh_token', { path: '/' });
@@ -106,7 +97,7 @@ export class AuthController {
 
     @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('web3-login')
-    async web3Login(@Body() dto: Web3LoginDto, @Res({ passthrough: true }) res?: Response) {
+    async web3Login(@Body() dto: Web3LoginDto, @Res({ passthrough: true }) res?: any) {
         const result = await this.authService.web3Login(dto);
         this.setAuthCookies(res, result.accessToken, result.refreshToken);
         return result;
@@ -217,7 +208,11 @@ export class AuthController {
 
     @UseGuards(JwtAuthGuard)
     @Post('logout')
-    async logout(@Request() req: any) {
+    async logout(@Request() req: any, @Res({ passthrough: true }) res?: any) {
+        if (res && typeof res.clearCookie === 'function') {
+            res.clearCookie('pharma_access_token', { path: '/' });
+            res.clearCookie('pharma_refresh_token', { path: '/' });
+        }
         const rawToken = req.headers?.authorization?.slice(7)?.trim();
         const rawId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
         const userId = rawId ? Number(rawId) : undefined;
