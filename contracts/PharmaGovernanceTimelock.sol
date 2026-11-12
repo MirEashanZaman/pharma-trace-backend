@@ -2,18 +2,34 @@
 pragma solidity ^0.8.20;
 
 contract PharmaGovernanceTimelock {
+    error NotAuthorizedGuardian();
+    error GuardiansRequired();
+    error InvalidConfirmationThreshold();
+    error InvalidGuardianAddress();
+    error DuplicateGuardian();
+    error TargetZeroAddress();
+    error ProposalCollision();
+    error ProposalNotFound();
+    error ProposalNotQueued();
+    error GuardianAlreadyConfirmed();
+    error InsufficientConfirmations();
+    error TimelockDelayNotElapsed();
+    error ProposalExpiredPastGracePeriod();
+    error GovernanceCallExecutionFailed();
+    error ProposalNotInCancellableStatus();
+
     enum ProposalStatus { PENDING, QUEUED, EXECUTED, CANCELLED, EXPIRED }
 
     struct Proposal {
         bytes32 id;
-        address proposer;
-        address target;
         uint256 value;
+        address proposer;
+        uint64 eta;
+        ProposalStatus status;
+        address target;
+        uint32 confirmations;
         bytes data;
         string description;
-        uint256 eta;
-        uint256 confirmations;
-        ProposalStatus status;
     }
 
     uint256 public constant GRACE_PERIOD = 14 days;
@@ -50,7 +66,7 @@ contract PharmaGovernanceTimelock {
     );
 
     modifier onlyGuardian() {
-        require(isGuardian[msg.sender], "Caller is not an authorized regulatory guardian");
+        if (!isGuardian[msg.sender]) revert NotAuthorizedGuardian();
         _;
     }
 
@@ -59,16 +75,13 @@ contract PharmaGovernanceTimelock {
         uint256 _requiredThreshold,
         uint256 _minDelay
     ) {
-        require(_guardians.length > 0, "Guardians required");
-        require(
-            _requiredThreshold > 0 && _requiredThreshold <= _guardians.length,
-            "Invalid confirmation threshold"
-        );
+        if (_guardians.length == 0) revert GuardiansRequired();
+        if (_requiredThreshold == 0 || _requiredThreshold > _guardians.length) revert InvalidConfirmationThreshold();
 
         for (uint256 i = 0; i < _guardians.length; i++) {
             address guardian = _guardians[i];
-            require(guardian != address(0), "Invalid guardian address");
-            require(!isGuardian[guardian], "Duplicate guardian");
+            if (guardian == address(0)) revert InvalidGuardianAddress();
+            if (isGuardian[guardian]) revert DuplicateGuardian();
             isGuardian[guardian] = true;
             guardians.push(guardian);
         }
@@ -83,25 +96,25 @@ contract PharmaGovernanceTimelock {
         bytes calldata data,
         string calldata description
     ) external onlyGuardian returns (bytes32) {
-        require(target != address(0), "Target cannot be zero address");
+        if (target == address(0)) revert TargetZeroAddress();
 
         bytes32 proposalId = keccak256(
             abi.encode(target, value, data, description, block.timestamp, msg.sender)
         );
-        require(proposals[proposalId].eta == 0, "Proposal ID collision");
+        if (proposals[proposalId].eta != 0) revert ProposalCollision();
 
         uint256 eta = block.timestamp + minDelay;
 
         proposals[proposalId] = Proposal({
             id: proposalId,
-            proposer: msg.sender,
-            target: target,
             value: value,
-            data: data,
-            description: description,
-            eta: eta,
+            proposer: msg.sender,
+            eta: uint64(eta),
+            status: ProposalStatus.QUEUED,
+            target: target,
             confirmations: 1,
-            status: ProposalStatus.QUEUED
+            data: data,
+            description: description
         });
 
         confirmations[proposalId][msg.sender] = true;
@@ -114,9 +127,9 @@ contract PharmaGovernanceTimelock {
 
     function confirmProposal(bytes32 proposalId) external onlyGuardian {
         Proposal storage proposal = proposals[proposalId];
-        require(proposal.eta > 0, "Proposal does not exist");
-        require(proposal.status == ProposalStatus.QUEUED, "Proposal is not in queued status");
-        require(!confirmations[proposalId][msg.sender], "Guardian already confirmed proposal");
+        if (proposal.eta == 0) revert ProposalNotFound();
+        if (proposal.status != ProposalStatus.QUEUED) revert ProposalNotQueued();
+        if (confirmations[proposalId][msg.sender]) revert GuardianAlreadyConfirmed();
 
         confirmations[proposalId][msg.sender] = true;
         proposal.confirmations += 1;
@@ -126,21 +139,18 @@ contract PharmaGovernanceTimelock {
 
     function executeProposal(bytes32 proposalId) external payable onlyGuardian returns (bytes memory) {
         Proposal storage proposal = proposals[proposalId];
-        require(proposal.eta > 0, "Proposal does not exist");
-        require(proposal.status == ProposalStatus.QUEUED, "Proposal not queued");
-        require(
-            proposal.confirmations >= requiredThreshold,
-            "Insufficient guardian threshold confirmations"
-        );
-        require(block.timestamp >= proposal.eta, "Timelock delay has not elapsed");
-        require(block.timestamp <= proposal.eta + GRACE_PERIOD, "Proposal expired past grace period");
+        if (proposal.eta == 0) revert ProposalNotFound();
+        if (proposal.status != ProposalStatus.QUEUED) revert ProposalNotQueued();
+        if (proposal.confirmations < requiredThreshold) revert InsufficientConfirmations();
+        if (block.timestamp < proposal.eta) revert TimelockDelayNotElapsed();
+        if (block.timestamp > proposal.eta + GRACE_PERIOD) revert ProposalExpiredPastGracePeriod();
 
         proposal.status = ProposalStatus.EXECUTED;
 
         (bool success, bytes memory returnData) = proposal.target.call{value: proposal.value}(
             proposal.data
         );
-        require(success, "Governance proposal call execution failed");
+        if (!success) revert GovernanceCallExecutionFailed();
 
         emit ProposalExecuted(proposalId, msg.sender, returnData);
         return returnData;
@@ -148,8 +158,8 @@ contract PharmaGovernanceTimelock {
 
     function cancelProposal(bytes32 proposalId, string calldata reason) external onlyGuardian {
         Proposal storage proposal = proposals[proposalId];
-        require(proposal.eta > 0, "Proposal does not exist");
-        require(proposal.status == ProposalStatus.QUEUED, "Proposal not in cancellable status");
+        if (proposal.eta == 0) revert ProposalNotFound();
+        if (proposal.status != ProposalStatus.QUEUED) revert ProposalNotInCancellableStatus();
 
         proposal.status = ProposalStatus.CANCELLED;
         emit ProposalCancelled(proposalId, msg.sender, reason);
