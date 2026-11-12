@@ -43,25 +43,25 @@ describe("PharmaGovernanceTimelock Contract", function () {
       const PharmaGovernanceTimelock = await ethers.getContractFactory("PharmaGovernanceTimelock");
       await expect(
         PharmaGovernanceTimelock.deploy([], 1, minDelay)
-      ).to.be.revertedWith("Guardians required");
+      ).to.be.revertedWithCustomError(PharmaGovernanceTimelock, "GuardiansRequired");
     });
 
     it("should reject deployment with invalid threshold", async function () {
       const PharmaGovernanceTimelock = await ethers.getContractFactory("PharmaGovernanceTimelock");
       await expect(
         PharmaGovernanceTimelock.deploy([guardianA.address], 0, minDelay)
-      ).to.be.revertedWith("Invalid confirmation threshold");
+      ).to.be.revertedWithCustomError(PharmaGovernanceTimelock, "InvalidConfirmationThreshold");
 
       await expect(
         PharmaGovernanceTimelock.deploy([guardianA.address], 2, minDelay)
-      ).to.be.revertedWith("Invalid confirmation threshold");
+      ).to.be.revertedWithCustomError(PharmaGovernanceTimelock, "InvalidConfirmationThreshold");
     });
 
     it("should reject deployment with duplicate guardians", async function () {
       const PharmaGovernanceTimelock = await ethers.getContractFactory("PharmaGovernanceTimelock");
       await expect(
         PharmaGovernanceTimelock.deploy([guardianA.address, guardianA.address], 1, minDelay)
-      ).to.be.revertedWith("Duplicate guardian");
+      ).to.be.revertedWithCustomError(PharmaGovernanceTimelock, "DuplicateGuardian");
     });
   });
 
@@ -109,7 +109,7 @@ describe("PharmaGovernanceTimelock Contract", function () {
           callData,
           sampleDescription
         )
-      ).to.be.revertedWith("Caller is not an authorized regulatory guardian");
+      ).to.be.revertedWithCustomError(timelock, "NotAuthorizedGuardian");
     });
 
     it("should reject proposals targeting zero address", async function () {
@@ -120,7 +120,7 @@ describe("PharmaGovernanceTimelock Contract", function () {
           callData,
           sampleDescription
         )
-      ).to.be.revertedWith("Target cannot be zero address");
+      ).to.be.revertedWithCustomError(timelock, "TargetZeroAddress");
     });
   });
 
@@ -153,13 +153,13 @@ describe("PharmaGovernanceTimelock Contract", function () {
     it("should reject duplicate confirmation by the same guardian", async function () {
       await expect(
         timelock.connect(guardianA).confirmProposal(proposalId)
-      ).to.be.revertedWith("Guardian already confirmed proposal");
+      ).to.be.revertedWithCustomError(timelock, "GuardianAlreadyConfirmed");
     });
 
     it("should reject confirmations from non-guardians", async function () {
       await expect(
         timelock.connect(nonGuardian).confirmProposal(proposalId)
-      ).to.be.revertedWith("Caller is not an authorized regulatory guardian");
+      ).to.be.revertedWithCustomError(timelock, "NotAuthorizedGuardian");
     });
   });
 
@@ -186,7 +186,7 @@ describe("PharmaGovernanceTimelock Contract", function () {
     it("should reject execution before timelock delay has elapsed", async function () {
       await expect(
         timelock.connect(guardianA).executeProposal(proposalId)
-      ).to.be.revertedWith("Timelock delay has not elapsed");
+      ).to.be.revertedWithCustomError(timelock, "TimelockDelayNotElapsed");
     });
 
     it("should reject execution if confirmation threshold is not met", async function () {
@@ -205,7 +205,7 @@ describe("PharmaGovernanceTimelock Contract", function () {
 
       await expect(
         timelock.connect(guardianA).executeProposal(singleProposalId)
-      ).to.be.revertedWith("Insufficient guardian threshold confirmations");
+      ).to.be.revertedWithCustomError(timelock, "InsufficientConfirmations");
     });
 
     it("should execute proposal successfully after timelock delay elapses", async function () {
@@ -231,7 +231,7 @@ describe("PharmaGovernanceTimelock Contract", function () {
 
       await expect(
         timelock.connect(guardianA).executeProposal(proposalId)
-      ).to.be.revertedWith("Proposal expired past grace period");
+      ).to.be.revertedWithCustomError(timelock, "ProposalExpiredPastGracePeriod");
     });
   });
 
@@ -270,7 +270,7 @@ describe("PharmaGovernanceTimelock Contract", function () {
 
       await expect(
         timelock.connect(guardianA).executeProposal(proposalId)
-      ).to.be.revertedWith("Proposal not queued");
+      ).to.be.revertedWithCustomError(timelock, "ProposalNotQueued");
     });
   });
 });
