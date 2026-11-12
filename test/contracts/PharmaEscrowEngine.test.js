@@ -73,7 +73,7 @@ describe("PharmaEscrowEngine Contract", function () {
           timeoutDuration,
           { value: 0n }
         )
-      ).to.be.revertedWith("Escrow deposit must be greater than zero");
+      ).to.be.revertedWithCustomError(escrowEngine, "EscrowDepositZero");
     });
 
     it("should reject duplicate escrow creation for same order identifier", async function () {
@@ -93,7 +93,7 @@ describe("PharmaEscrowEngine Contract", function () {
           timeoutDuration,
           { value: depositAmount }
         )
-      ).to.be.revertedWith("Escrow order already exists");
+      ).to.be.revertedWithCustomError(escrowEngine, "EscrowAlreadyExists");
     });
 
     it("should reject escrow creation with invalid zero address seller", async function () {
@@ -105,7 +105,7 @@ describe("PharmaEscrowEngine Contract", function () {
           timeoutDuration,
           { value: depositAmount }
         )
-      ).to.be.revertedWith("Invalid seller address");
+      ).to.be.revertedWithCustomError(escrowEngine, "InvalidSellerAddress");
     });
   });
 
@@ -163,7 +163,7 @@ describe("PharmaEscrowEngine Contract", function () {
           true,
           true
         )
-      ).to.be.revertedWith("Unauthorized to record compliance");
+      ).to.be.revertedWithCustomError(escrowEngine, "Unauthorized");
     });
   });
 
@@ -209,7 +209,7 @@ describe("PharmaEscrowEngine Contract", function () {
     it("should reject refund triggers from unauthorized accounts", async function () {
       await expect(
         escrowEngine.connect(unauthorized).triggerSpoilageRefund(sampleOrderId, "Unauthorized refund")
-      ).to.be.revertedWith("Unauthorized to trigger refund");
+      ).to.be.revertedWithCustomError(escrowEngine, "Unauthorized");
     });
   });
 
