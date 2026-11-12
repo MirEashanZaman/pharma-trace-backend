@@ -25,6 +25,27 @@ export class DigitalTwin {
   }
 }
 
+export class BatchTwin {
+  id: string;
+  batchTokenId!: BigInt;
+  batchNumber!: string;
+  manufacturer!: Bytes;
+  totalUnits!: BigInt;
+  mintedAt!: BigInt;
+  blockNumber!: BigInt;
+  transactionHash!: Bytes;
+
+  constructor(id: string) {
+    this.id = id;
+  }
+
+  save(): void {}
+
+  static load(id: string): BatchTwin | null {
+    return new BatchTwin(id);
+  }
+}
+
 export class CustodyTransfer {
   id: string;
   twin!: string;
@@ -100,6 +121,7 @@ export class BatchAnchor {
   submitter!: Bytes;
   timestamp!: BigInt;
   isRevoked!: boolean;
+  revocationReason?: string;
   blockNumber!: BigInt;
   transactionHash!: Bytes;
 
@@ -124,6 +146,8 @@ export class Accreditation {
   validUntil!: BigInt;
   metadataCid!: string;
   isRevoked!: boolean;
+  isLocked!: boolean;
+  revocationReason?: string;
   issuedAt!: BigInt;
   blockNumber!: BigInt;
   transactionHash!: Bytes;
@@ -136,5 +160,76 @@ export class Accreditation {
 
   static load(id: string): Accreditation | null {
     return new Accreditation(id);
+  }
+}
+
+export class CarrierBond {
+  id: string;
+  shipmentId!: Bytes;
+  carrier!: Bytes;
+  manufacturer!: Bytes;
+  bondAmount!: BigInt;
+  status!: string;
+  lockedAt!: BigInt;
+  resolvedAt?: BigInt;
+  resolutionReason?: string;
+  slashedAmount?: BigInt;
+  consensusReportHash?: Bytes;
+  blockNumber!: BigInt;
+  transactionHash!: Bytes;
+
+  constructor(id: string) {
+    this.id = id;
+  }
+
+  save(): void {}
+
+  static load(id: string): CarrierBond | null {
+    return new CarrierBond(id);
+  }
+}
+
+export class ZkColdChainRecord {
+  id: string;
+  batchHash!: Bytes;
+  isCompliant!: boolean;
+  minTemp!: BigInt;
+  maxTemp!: BigInt;
+  verifiedAt!: BigInt;
+  blockNumber!: BigInt;
+  transactionHash!: Bytes;
+
+  constructor(id: string) {
+    this.id = id;
+  }
+
+  save(): void {}
+
+  static load(id: string): ZkColdChainRecord | null {
+    return new ZkColdChainRecord(id);
+  }
+}
+
+export class ColdChainTelemetryEvent {
+  id: string;
+  shipmentId!: Bytes;
+  eventType!: string;
+  recordedTemp?: BigInt;
+  minTemp?: BigInt;
+  maxTemp?: BigInt;
+  slashPercentage?: BigInt;
+  reason?: string;
+  timestamp!: BigInt;
+  blockNumber!: BigInt;
+  transactionHash!: Bytes;
+
+  constructor(id: string) {
+    this.id = id;
+  }
+
+  save(): void {}
+
+  static load(id: string): ColdChainTelemetryEvent | null {
+    return new ColdChainTelemetryEvent(id);
   }
 }
