@@ -6,7 +6,7 @@ dataSources:
     name: PharmaDigitalTwin
     network: mainnet
     source:
-      address: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      address: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
       abi: PharmaDigitalTwin
       startBlock: 0
     mapping:
@@ -15,6 +15,7 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - DigitalTwin
+        - BatchTwin
         - CustodyTransfer
       abis:
         - name: PharmaDigitalTwin
@@ -34,7 +35,7 @@ dataSources:
     name: PharmaEscrowEngine
     network: mainnet
     source:
-      address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+      address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
       abi: PharmaEscrowEngine
       startBlock: 0
     mapping:
@@ -61,7 +62,7 @@ dataSources:
     name: PharmaTraceAttestation
     network: mainnet
     source:
-      address: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      address: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
       abi: PharmaTraceAttestation
       startBlock: 0
     mapping:
@@ -82,8 +83,12 @@ dataSources:
           handler: handleAttestationRevoked
         - event: BatchAnchored(indexed bytes32,uint32,string,indexed address,uint256)
           handler: handleBatchAnchored
+        - event: BatchRevoked(indexed bytes32,indexed address,uint256,string)
+          handler: handleBatchRevoked
         - event: AccreditationIssued(indexed bytes32,indexed address,indexed address,string,string,uint256,string)
           handler: handleAccreditationIssued
+        - event: AccreditationRevoked(indexed bytes32,indexed address,uint256,string)
+          handler: handleAccreditationRevoked
         - event: Locked(indexed bytes32)
           handler: handleAccreditationLocked
       file: ./src/mapping.ts
@@ -92,7 +97,7 @@ dataSources:
     name: CarrierStakingEscrow
     network: mainnet
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
       abi: CarrierStakingEscrow
       startBlock: 0
     mapping:
@@ -117,7 +122,7 @@ dataSources:
     name: ZkColdChainVerifier
     network: mainnet
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
       abi: ZkColdChainVerifier
       startBlock: 0
     mapping:
@@ -132,4 +137,31 @@ dataSources:
       eventHandlers:
         - event: ProofVerified(indexed bytes32,indexed bool,uint256,uint256,uint256)
           handler: handleProofVerified
+      file: ./src/mapping.ts
+
+  - kind: ethereum
+    name: ColdChainAutomationOracle
+    network: mainnet
+    source:
+      address: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      abi: ColdChainAutomationOracle
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - ColdChainTelemetryEvent
+      abis:
+        - name: ColdChainAutomationOracle
+          file: ../src/blockchain/artifacts/ColdChainAutomationOracle.json
+      eventHandlers:
+        - event: PolicyRegistered(indexed bytes32,int256,int256,uint256)
+          handler: handlePolicyRegistered
+        - event: ExcursionDetected(indexed bytes32,int256,uint256)
+          handler: handleExcursionDetected
+        - event: ExcursionResolved(indexed bytes32,uint256)
+          handler: handleExcursionResolved
+        - event: AutomationSlashTriggered(indexed bytes32,uint256,string)
+          handler: handleAutomationSlashTriggered
       file: ./src/mapping.ts
