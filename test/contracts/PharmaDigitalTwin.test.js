@@ -136,7 +136,7 @@ describe("PharmaDigitalTwin Contract", function () {
           expirationDate,
           sampleCid
         )
-      ).to.be.revertedWith("Unauthorized to mint digital twin");
+      ).to.be.revertedWithCustomError(digitalTwin, "Unauthorized");
     });
 
     it("should reject duplicate minting for identical serial numbers", async function () {
@@ -160,7 +160,7 @@ describe("PharmaDigitalTwin Contract", function () {
           expirationDate,
           sampleCid
         )
-      ).to.be.revertedWith("Serial twin already exists");
+      ).to.be.revertedWithCustomError(digitalTwin, "SerialTwinAlreadyExists");
     });
   });
 
@@ -214,7 +214,7 @@ describe("PharmaDigitalTwin Contract", function () {
           distributor.address,
           tokenId
         )
-      ).to.be.revertedWith("Caller not authorized to transfer");
+      ).to.be.revertedWithCustomError(digitalTwin, "Unauthorized");
     });
 
     it("should reject custody transfer if from address lacks balance", async function () {
@@ -224,7 +224,7 @@ describe("PharmaDigitalTwin Contract", function () {
           dispenser.address,
           tokenId
         )
-      ).to.be.revertedWith("Insufficient balance to transfer");
+      ).to.be.revertedWithCustomError(digitalTwin, "InsufficientBalance");
     });
   });
 
@@ -265,7 +265,7 @@ describe("PharmaDigitalTwin Contract", function () {
     it("should reject burn attempts from unauthorized non-dispensers", async function () {
       await expect(
         digitalTwin.connect(unauthorized).burnOnDispense(sampleSerial, dispenser.address)
-      ).to.be.revertedWith("Caller not authorized to dispense");
+      ).to.be.revertedWithCustomError(digitalTwin, "Unauthorized");
     });
 
     it("should prevent duplicate burn on already burned digital twin", async function () {
@@ -273,7 +273,7 @@ describe("PharmaDigitalTwin Contract", function () {
 
       await expect(
         digitalTwin.connect(dispenser).burnOnDispense(sampleSerial, dispenser.address)
-      ).to.be.revertedWith("Dispenser does not hold item");
+      ).to.be.revertedWithCustomError(digitalTwin, "DispenserDoesNotHoldItem");
     });
 
     it("should prevent custody transfer after burning", async function () {
@@ -285,7 +285,7 @@ describe("PharmaDigitalTwin Contract", function () {
           distributor.address,
           tokenId
         )
-      ).to.be.revertedWith("Insufficient balance to transfer");
+      ).to.be.revertedWithCustomError(digitalTwin, "InsufficientBalance");
     });
   });
 
