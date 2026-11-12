@@ -16,6 +16,16 @@ contract PharmaDigitalTwin is
     OwnableUpgradeable,
     UUPSUpgradeable
 {
+    error Unauthorized();
+    error ZeroAddress();
+    error SerialTwinAlreadyExists();
+    error BatchTwinAlreadyExists();
+    error CannotTransferToSelf();
+    error InsufficientBalance();
+    error ItemAlreadyBurned();
+    error ItemDoesNotExist();
+    error DispenserDoesNotHoldItem();
+
     string public name;
     string public symbol;
 
@@ -27,12 +37,12 @@ contract PharmaDigitalTwin is
 
     struct ItemMetadata {
         uint256 tokenId;
+        address currentHolder;
+        uint64 expirationDate;
+        ItemStatus status;
         string gtin;
         string batchNumber;
         string serialNumber;
-        uint256 expirationDate;
-        ItemStatus status;
-        address currentHolder;
         string ipfsDossierCid;
     }
 
@@ -82,9 +92,9 @@ contract PharmaDigitalTwin is
         uint256 expirationDate,
         string calldata ipfsDossierCid
     ) external returns (uint256) {
-        require(msg.sender == owner() || roles[MANUFACTURER_ROLE][msg.sender], "Unauthorized to mint digital twin");
-        require(to != address(0), "Cannot mint digital twin to zero address");
-        require(serialToTokenId[serialNumber] == 0, "Serial twin already exists");
+        if (msg.sender != owner() && !roles[MANUFACTURER_ROLE][msg.sender]) revert Unauthorized();
+        if (to == address(0)) revert ZeroAddress();
+        if (serialToTokenId[serialNumber] != 0) revert SerialTwinAlreadyExists();
 
         uint256 tokenId = uint256(keccak256(abi.encode(gtin, batchNumber, serialNumber)));
         _mint(to, tokenId, 1, "");
@@ -94,12 +104,12 @@ contract PharmaDigitalTwin is
 
         itemDetails[tokenId] = ItemMetadata({
             tokenId: tokenId,
+            currentHolder: to,
+            expirationDate: uint64(expirationDate),
+            status: ItemStatus.MINTED,
             gtin: gtin,
             batchNumber: batchNumber,
             serialNumber: serialNumber,
-            expirationDate: expirationDate,
-            status: ItemStatus.MINTED,
-            currentHolder: to,
             ipfsDossierCid: ipfsDossierCid
         });
 
@@ -115,10 +125,10 @@ contract PharmaDigitalTwin is
         uint256 expirationDate,
         string calldata ipfsDossierCid
     ) external returns (uint256) {
-        require(msg.sender == owner() || roles[MANUFACTURER_ROLE][msg.sender], "Unauthorized to mint digital twin");
-        require(to != address(0), "Cannot mint to zero address");
+        if (msg.sender != owner() && !roles[MANUFACTURER_ROLE][msg.sender]) revert Unauthorized();
+        if (to == address(0)) revert ZeroAddress();
         bytes32 batchKey = keccak256(abi.encodePacked(gtin, batchNumber));
-        require(batchToTokenId[batchKey] == 0, "Batch twin already exists");
+        if (batchToTokenId[batchKey] != 0) revert BatchTwinAlreadyExists();
 
         uint256 batchTokenId = uint256(batchKey);
         _mint(to, batchTokenId, totalQuantity, "");
@@ -128,12 +138,12 @@ contract PharmaDigitalTwin is
 
         itemDetails[batchTokenId] = ItemMetadata({
             tokenId: batchTokenId,
+            currentHolder: to,
+            expirationDate: uint64(expirationDate),
+            status: ItemStatus.MINTED,
             gtin: gtin,
             batchNumber: batchNumber,
             serialNumber: "BATCH_CONTAINER",
-            expirationDate: expirationDate,
-            status: ItemStatus.MINTED,
-            currentHolder: to,
             ipfsDossierCid: ipfsDossierCid
         });
 
@@ -146,11 +156,11 @@ contract PharmaDigitalTwin is
         address to,
         uint256 tokenId
     ) external {
-        require(msg.sender == from || msg.sender == owner() || isApprovedForAll(from, msg.sender), "Caller not authorized to transfer");
-        require(to != address(0), "Cannot transfer custody to zero address");
-        require(from != to, "Cannot transfer custody to self");
-        require(balanceOf(from, tokenId) >= 1, "Insufficient balance to transfer");
-        require(itemDetails[tokenId].status != ItemStatus.BURNED, "Cannot transfer burned item");
+        if (msg.sender != from && msg.sender != owner() && !isApprovedForAll(from, msg.sender)) revert Unauthorized();
+        if (to == address(0)) revert ZeroAddress();
+        if (from == to) revert CannotTransferToSelf();
+        if (balanceOf(from, tokenId) < 1) revert InsufficientBalance();
+        if (itemDetails[tokenId].status == ItemStatus.BURNED) revert ItemAlreadyBurned();
 
         _safeTransferFrom(from, to, tokenId, 1, "");
         itemDetails[tokenId].currentHolder = to;
@@ -163,12 +173,12 @@ contract PharmaDigitalTwin is
         string calldata serialNumber,
         address dispenser
     ) external returns (bool) {
-        require(msg.sender == owner() || roles[DISPENSER_ROLE][msg.sender], "Caller not authorized to dispense");
-        require(dispenser != address(0), "Invalid dispenser address");
+        if (msg.sender != owner() && !roles[DISPENSER_ROLE][msg.sender]) revert Unauthorized();
+        if (dispenser == address(0)) revert ZeroAddress();
         uint256 tokenId = serialToTokenId[serialNumber];
-        require(tokenId != 0, "Item does not exist");
-        require(balanceOf(dispenser, tokenId) >= 1, "Dispenser does not hold item");
-        require(itemDetails[tokenId].status != ItemStatus.BURNED, "Item already burned or consumed");
+        if (tokenId == 0) revert ItemDoesNotExist();
+        if (balanceOf(dispenser, tokenId) < 1) revert DispenserDoesNotHoldItem();
+        if (itemDetails[tokenId].status == ItemStatus.BURNED) revert ItemAlreadyBurned();
 
         _burn(dispenser, tokenId, 1);
         itemDetails[tokenId].status = ItemStatus.BURNED;
