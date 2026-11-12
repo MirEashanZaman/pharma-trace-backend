@@ -171,10 +171,10 @@ export class BlockchainController {
     }
 
     @Post('zk/cold-chain-proof')
-    generateColdChainProof(
+    async generateColdChainProof(
         @Body() body: { readings: number[]; minTemp?: number; maxTemp?: number; batchHash?: string }
     ) {
-        return this.zkProofEngine.generateColdChainProof(
+        return await this.zkProofEngine.generateColdChainProof(
             body.readings,
             body.minTemp ?? 2.0,
             body.maxTemp ?? 8.0,
@@ -183,8 +183,28 @@ export class BlockchainController {
     }
 
     @Post('zk/verify-cold-chain')
-    verifyColdChainProof(@Body() proof: any) {
-        return this.zkProofEngine.verifyColdChainProof(proof);
+    async verifyColdChainProof(@Body() proof: any) {
+        return await this.zkProofEngine.verifyColdChainProof(proof);
+    }
+
+    @Post('zk/solidity-calldata')
+    exportSolidityCalldata(@Body() proof: any) {
+        return this.zkProofEngine.exportSolidityCalldata(proof);
+    }
+
+    @Post('zk/verify-on-chain')
+    async verifyOnChain(
+        @Body() body: { a: [string, string]; b: [[string, string], [string, string]]; c: [string, string]; batchHash: string; minTemp: number; maxTemp: number }
+    ) {
+        const verified = await this.blockchainService.verifyZkProofOnChain(
+            body.a,
+            body.b,
+            body.c,
+            body.batchHash,
+            body.minTemp,
+            body.maxTemp
+        );
+        return { success: verified, batchHash: body.batchHash };
     }
 
     @Post('paymaster/sponsor')
