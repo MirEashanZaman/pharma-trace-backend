@@ -18,8 +18,15 @@ describe("PharmaDigitalTwin Contract", function () {
     [owner, manufacturer, distributor, dispenser, unauthorized] = await ethers.getSigners();
 
     const PharmaDigitalTwin = await ethers.getContractFactory("PharmaDigitalTwin");
-    digitalTwin = await PharmaDigitalTwin.deploy();
-    await digitalTwin.waitForDeployment();
+    const impl = await PharmaDigitalTwin.deploy();
+    await impl.waitForDeployment();
+
+    const PharmaUUPSProxy = await ethers.getContractFactory("PharmaUUPSProxy");
+    const initData = PharmaDigitalTwin.interface.encodeFunctionData("initialize", [owner.address]);
+    const proxy = await PharmaUUPSProxy.deploy(await impl.getAddress(), initData);
+    await proxy.waitForDeployment();
+
+    digitalTwin = PharmaDigitalTwin.attach(await proxy.getAddress());
 
     const manufacturerRole = await digitalTwin.MANUFACTURER_ROLE();
     const dispenserRole = await digitalTwin.DISPENSER_ROLE();
@@ -50,7 +57,25 @@ describe("PharmaDigitalTwin Contract", function () {
       const manufacturerRole = await digitalTwin.MANUFACTURER_ROLE();
       await expect(
         digitalTwin.connect(unauthorized).grantRole(manufacturerRole, unauthorized.address)
-      ).to.be.revertedWith("Only owner authorized");
+      ).to.be.revertedWithCustomError(digitalTwin, "OwnableUnauthorizedAccount");
+    });
+
+    it("should support UUPS upgrades by owner", async function () {
+      const PharmaDigitalTwinV2 = await ethers.getContractFactory("PharmaDigitalTwin");
+      const newImpl = await PharmaDigitalTwinV2.deploy();
+      await newImpl.waitForDeployment();
+
+      await expect(digitalTwin.upgradeToAndCall(await newImpl.getAddress(), "0x")).to.not.be.reverted;
+    });
+
+    it("should revert UUPS upgrades by non-owner", async function () {
+      const PharmaDigitalTwinV2 = await ethers.getContractFactory("PharmaDigitalTwin");
+      const newImpl = await PharmaDigitalTwinV2.deploy();
+      await newImpl.waitForDeployment();
+
+      await expect(
+        digitalTwin.connect(unauthorized).upgradeToAndCall(await newImpl.getAddress(), "0x")
+      ).to.be.revertedWithCustomError(digitalTwin, "OwnableUnauthorizedAccount");
     });
   });
 
