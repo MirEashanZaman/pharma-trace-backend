@@ -1,16 +1,17 @@
-# PharmaTrace Subgraph
+# PharmaTrace Graph Protocol Subgraph
 
 The Graph Protocol Subgraph indexing pharmaceutical supply chain provenance across the PharmaTrace smart contract ecosystem.
 
 ## Overview
 
-The subgraph indexes events emitted across the core smart contracts:
-- `PharmaDigitalTwin`: Tokenized item and batch twins, serial numbers, GTINs, and custody transfers.
-- `PharmaEscrowEngine`: Commercial payment escrows, conditional cold-chain releases, and refunds.
-- `PharmaTraceAttestation`: Cryptographic attestations, Merkle batch rollups, and soulbound accreditations.
+The subgraph indexes events emitted across the core EVM smart contracts:
+- `PharmaDigitalTwin`: Tokenized item and batch twins, serial numbers, GTINs, and custody transfers with burn-on-dispense state.
+- `PharmaEscrowEngine`: Commercial payment escrows, conditional cold-chain releases, and breach refunds.
+- `PharmaTraceAttestation`: Cryptographic attestations, Merkle batch rollups, and soulbound compliance accreditations.
 - `CarrierStakingEscrow`: Carrier bonds, slashes, and performance stakes.
 - `ZkColdChainVerifier`: Groth16 zero-knowledge proof verification records.
 - `ColdChainAutomationOracle`: Automated IoT telemetry events, excursion alerts, and automated penalties.
+- `PharmaCrossChainBridge`: Cross-chain bridge messages and digital twin locks across Layer-2 rollups.
 
 ## Directory Structure
 
@@ -29,3 +30,7 @@ npm run build
 npm run create:local
 npm run deploy:local
 ```
+
+## Author & License
+
+Engineered by **Mir Eashan Zaman**. Licensed under the MIT License.
