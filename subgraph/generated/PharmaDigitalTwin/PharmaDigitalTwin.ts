@@ -31,6 +31,35 @@ export class ItemMinted {
   }
 }
 
+export class BatchTwinMinted {
+  params: {
+    batchTokenId: BigInt;
+    batchNumber: string;
+    manufacturer: Bytes;
+    totalUnits: BigInt;
+  };
+  block: { timestamp: BigInt; number: BigInt };
+  transaction: { hash: Bytes };
+  logIndex: BigInt;
+
+  constructor(
+    params: {
+      batchTokenId: BigInt;
+      batchNumber: string;
+      manufacturer: Bytes;
+      totalUnits: BigInt;
+    },
+    block: { timestamp: BigInt; number: BigInt },
+    transaction: { hash: Bytes },
+    logIndex: BigInt,
+  ) {
+    this.params = params;
+    this.block = block;
+    this.transaction = transaction;
+    this.logIndex = logIndex;
+  }
+}
+
 export class CustodyTransferred {
   params: {
     tokenId: BigInt;
