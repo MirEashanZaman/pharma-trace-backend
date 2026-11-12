@@ -65,14 +65,20 @@ async function main() {
     const carrierStakingAddress = await deployContract('CarrierStakingEscrow', deployer, [stakingToken]);
     console.log(`CarrierStakingEscrow deployed: ${carrierStakingAddress}`);
 
-    const digitalTwinAddress = await deployContract('PharmaDigitalTwin', deployer, []);
-    console.log(`PharmaDigitalTwin deployed: ${digitalTwinAddress}`);
+    const digitalTwinImpl = await deployContract('PharmaDigitalTwin', deployer, []);
+    const digitalTwinFactory = await hre.ethers.getContractFactory('PharmaDigitalTwin', deployer);
+    const digitalTwinInitData = digitalTwinFactory.interface.encodeFunctionData('initialize', [deployerAddress]);
+    const digitalTwinAddress = await deployContract('PharmaUUPSProxy', deployer, [digitalTwinImpl, digitalTwinInitData]);
+    console.log(`PharmaDigitalTwin UUPS Proxy deployed: ${digitalTwinAddress} (Implementation: ${digitalTwinImpl})`);
 
     const escrowEngineAddress = await deployContract('PharmaEscrowEngine', deployer, []);
     console.log(`PharmaEscrowEngine deployed: ${escrowEngineAddress}`);
 
-    const attestationAddress = await deployContract('PharmaTraceAttestation', deployer, []);
-    console.log(`PharmaTraceAttestation deployed: ${attestationAddress}`);
+    const attestationImpl = await deployContract('PharmaTraceAttestation', deployer, []);
+    const attestationFactory = await hre.ethers.getContractFactory('PharmaTraceAttestation', deployer);
+    const attestationInitData = attestationFactory.interface.encodeFunctionData('initialize', [deployerAddress]);
+    const attestationAddress = await deployContract('PharmaUUPSProxy', deployer, [attestationImpl, attestationInitData]);
+    console.log(`PharmaTraceAttestation UUPS Proxy deployed: ${attestationAddress} (Implementation: ${attestationImpl})`);
 
     const paymasterAddress = await deployContract('PharmaPaymaster', deployer, [deployerAddress]);
     console.log(`PharmaPaymaster deployed: ${paymasterAddress}`);
@@ -111,8 +117,10 @@ async function main() {
             PharmaGovernanceTimelock: timelockAddress,
             CarrierStakingEscrow: carrierStakingAddress,
             PharmaDigitalTwin: digitalTwinAddress,
+            PharmaDigitalTwinImplementation: digitalTwinImpl,
             PharmaEscrowEngine: escrowEngineAddress,
             PharmaTraceAttestation: attestationAddress,
+            PharmaTraceAttestationImplementation: attestationImpl,
             PharmaPaymaster: paymasterAddress,
             ZkColdChainVerifier: zkVerifierAddress
         }
