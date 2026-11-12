@@ -90,6 +90,22 @@ describe('ZkProofEngine', () => {
         expect(result.isValid).toBe(true);
         expect(result.isCompliant).toBe(true);
         expect(result.proofDigest).toBeDefined();
+        expect(result.isReplay).toBe(false);
+    });
+
+    it('should detect and reject replayed proofs when nullifier is marked as used', async () => {
+        const readings = [3.5, 4.1, 4.5, 5.0];
+        const { proof } = await engine.generateColdChainProof(readings, 2.0, 8.0);
+
+        const initial = await engine.verifyColdChainProof(proof);
+        expect(initial.isValid).toBe(true);
+        expect(initial.isReplay).toBe(false);
+
+        engine.markProofNullifierUsed(initial.proofDigest);
+
+        const replayed = await engine.verifyColdChainProof(proof);
+        expect(replayed.isReplay).toBe(true);
+        expect(replayed.isValid).toBe(false);
     });
 
     it('should reject malformed or tampered proof object', async () => {
