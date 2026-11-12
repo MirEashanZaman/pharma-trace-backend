@@ -1,14 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import {ERC1155Supply} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
-import {ERC1155URIStorage} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155URIStorage.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
+import {ERC1155SupplyUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol";
+import {ERC1155URIStorageUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155URIStorageUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract PharmaDigitalTwin is ERC1155, ERC1155Supply, ERC1155URIStorage, Ownable {
-    string public name = "PharmaTrace Digital Twin";
-    string public symbol = "PTDT";
+contract PharmaDigitalTwin is
+    Initializable,
+    ERC1155Upgradeable,
+    ERC1155SupplyUpgradeable,
+    ERC1155URIStorageUpgradeable,
+    OwnableUpgradeable,
+    UUPSUpgradeable
+{
+    string public name;
+    string public symbol;
 
     bytes32 public constant MANUFACTURER_ROLE = keccak256("MANUFACTURER_ROLE");
     bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
@@ -37,11 +46,25 @@ contract PharmaDigitalTwin is ERC1155, ERC1155Supply, ERC1155URIStorage, Ownable
     event CustodyTransferred(uint256 indexed tokenId, address indexed from, address indexed to, uint256 amount);
     event ItemBurnedOnDispense(uint256 indexed tokenId, string indexed serialNumber, address indexed dispenser, uint256 timestamp);
 
-    constructor() ERC1155("https://pharmatrace.io/api/v1/metadata/{id}.json") Ownable(msg.sender) {
-        roles[MANUFACTURER_ROLE][msg.sender] = true;
-        roles[DISTRIBUTOR_ROLE][msg.sender] = true;
-        roles[DISPENSER_ROLE][msg.sender] = true;
+    constructor() {
+        _disableInitializers();
     }
+
+    function initialize(address initialOwner) external initializer {
+        __ERC1155_init("https://pharmatrace.io/api/v1/metadata/{id}.json");
+        __ERC1155Supply_init();
+        __ERC1155URIStorage_init();
+        __Ownable_init(initialOwner);
+
+        name = "PharmaTrace Digital Twin";
+        symbol = "PTDT";
+
+        roles[MANUFACTURER_ROLE][initialOwner] = true;
+        roles[DISTRIBUTOR_ROLE][initialOwner] = true;
+        roles[DISPENSER_ROLE][initialOwner] = true;
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function grantRole(bytes32 role, address account) external onlyOwner {
         roles[role][account] = true;
@@ -166,7 +189,7 @@ contract PharmaDigitalTwin is ERC1155, ERC1155Supply, ERC1155URIStorage, Ownable
         return (true, authentic, burned, item.status, item.currentHolder);
     }
 
-    function uri(uint256 tokenId) public view virtual override(ERC1155, ERC1155URIStorage) returns (string memory) {
+    function uri(uint256 tokenId) public view virtual override(ERC1155Upgradeable, ERC1155URIStorageUpgradeable) returns (string memory) {
         return super.uri(tokenId);
     }
 
@@ -175,7 +198,7 @@ contract PharmaDigitalTwin is ERC1155, ERC1155Supply, ERC1155URIStorage, Ownable
         address to,
         uint256[] memory ids,
         uint256[] memory values
-    ) internal virtual override(ERC1155, ERC1155Supply) {
+    ) internal virtual override(ERC1155Upgradeable, ERC1155SupplyUpgradeable) {
         super._update(from, to, ids, values);
     }
 }
