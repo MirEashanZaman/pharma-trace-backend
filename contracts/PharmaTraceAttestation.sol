@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
 interface IERC5192 {
     event Locked(uint256 tokenId);
     event Unlocked(uint256 tokenId);
     function locked(uint256 tokenId) external view returns (bool);
 }
 
-contract PharmaTraceAttestation is IERC5192 {
+contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
     bytes32 public constant REGULATOR_ROLE = keccak256("REGULATOR_ROLE");
     bytes32 public constant MANUFACTURER_ROLE = keccak256("MANUFACTURER_ROLE");
     bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
@@ -136,12 +139,19 @@ contract PharmaTraceAttestation is IERC5192 {
     }
 
     constructor() {
-        owner = msg.sender;
-        roles[REGULATOR_ROLE][msg.sender] = true;
-        roles[MANUFACTURER_ROLE][msg.sender] = true;
-        roles[DISTRIBUTOR_ROLE][msg.sender] = true;
-        roles[DISPENSER_ROLE][msg.sender] = true;
+        _disableInitializers();
     }
+
+    function initialize(address initialOwner) external initializer {
+        require(initialOwner != address(0), "Invalid initial owner");
+        owner = initialOwner;
+        roles[REGULATOR_ROLE][initialOwner] = true;
+        roles[MANUFACTURER_ROLE][initialOwner] = true;
+        roles[DISTRIBUTOR_ROLE][initialOwner] = true;
+        roles[DISPENSER_ROLE][initialOwner] = true;
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function pause() external {
         require(msg.sender == owner || roles[REGULATOR_ROLE][msg.sender], "Unauthorized to pause contract");
