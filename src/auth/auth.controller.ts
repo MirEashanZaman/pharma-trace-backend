@@ -7,9 +7,12 @@ import {
     Delete,
     UseGuards,
     Request,
+    Response as Res,
     Param,
     Query,
 } from '@nestjs/common';
+import { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
     RegisterDto,
@@ -30,38 +33,86 @@ import { UserRole } from './entities/user.entity';
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
 
+    private setAuthCookies(res?: Response, accessToken?: string, refreshToken?: string) {
+        if (!res || typeof res.cookie !== 'function') return;
+        const isProd = process.env.NODE_ENV === 'production';
+        if (accessToken) {
+            res.cookie('pharma_access_token', accessToken, {
+                httpOnly: true,
+                secure: isProd,
+                sameSite: 'strict',
+                path: '/',
+                maxAge: 15 * 60 * 1000,
+            });
+        }
+        if (refreshToken) {
+            res.cookie('pharma_refresh_token', refreshToken, {
+                httpOnly: true,
+                secure: isProd,
+                sameSite: 'strict',
+                path: '/',
+                maxAge: 7 * 24 * 60 * 60 * 1000,
+            });
+        }
+    }
+
     @Get('challenge/:walletAddress')
     getChallenge(@Param('walletAddress') walletAddress: string) {
         return this.authService.generateChallenge(walletAddress);
     }
 
+    @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('register')
-    register(@Body() dto: RegisterDto) {
-        return this.authService.register(dto);
+    async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res?: Response) {
+        const result = await this.authService.register(dto);
+        this.setAuthCookies(res, result.accessToken, result.refreshToken);
+        return result;
     }
 
+    @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('login')
-    login(@Body() dto: LoginDto) {
-        return this.authService.login(dto);
+    async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res?: Response) {
+        const result = await this.authService.login(dto);
+        this.setAuthCookies(res, result.accessToken, result.refreshToken);
+        return result;
     }
 
     @Post('refresh')
-    refreshSession(@Body() body: { userId: number; refreshToken: string }) {
-        return this.authService.refreshSession(Number(body?.userId), String(body?.refreshToken || ''));
+    async refreshSession(@Body() body: { userId: number; refreshToken: string }, @Res({ passthrough: true }) res?: Response) {
+        const result = await this.authService.refreshSession(Number(body?.userId), String(body?.refreshToken || ''));
+        this.setAuthCookies(res, result.accessToken, result.refreshToken);
+        return result;
+    }
+
+    @Post('logout')
+    logout(@Res({ passthrough: true }) res?: Response) {
+        if (res && typeof res.clearCookie === 'function') {
+            res.clearCookie('pharma_access_token', { path: '/' });
+            res.clearCookie('pharma_refresh_token', { path: '/' });
+        }
+        return { success: true, message: 'Logged out successfully' };
     }
 
     @UseGuards(JwtAuthGuard)
     @Post('revoke-sessions')
-    revokeSessions(@Request() req: any) {
+    revokeSessions(@Request() req: any, @Res({ passthrough: true }) res?: Response) {
+        if (res && typeof res.clearCookie === 'function') {
+            res.clearCookie('pharma_access_token', { path: '/' });
+            res.clearCookie('pharma_refresh_token', { path: '/' });
+        }
         const rawId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
         return this.authService.revokeAllUserSessions(Number(rawId));
     }
 
+    @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('web3-login')
-    web3Login(@Body() dto: Web3LoginDto) {
-        return this.authService.web3Login(dto);
+    async web3Login(@Body() dto: Web3LoginDto, @Res({ passthrough: true }) res?: Response) {
+        const result = await this.authService.web3Login(dto);
+        this.setAuthCookies(res, result.accessToken, result.refreshToken);
+        return result;
     }
 
+    @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('forgot-password')
     forgotPassword(@Body() dto: ForgotPasswordDto) {
         return this.authService.forgotPassword(dto);
@@ -72,6 +123,7 @@ export class AuthController {
         return this.authService.verifyOtp(dto);
     }
 
+    @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Post('reset-password')
     resetPassword(@Body() dto: ResetPasswordDto) {
         return this.authService.resetPassword(dto);
