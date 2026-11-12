@@ -1,6 +1,7 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts";
 import {
   ItemMinted,
+  BatchTwinMinted,
   CustodyTransferred,
   ItemBurnedOnDispense
 } from "../generated/PharmaDigitalTwin/PharmaDigitalTwin";
@@ -14,15 +15,36 @@ import {
   AttestationRegistered,
   AttestationRevoked,
   BatchAnchored,
-  AccreditationIssued
+  BatchRevoked,
+  AccreditationIssued,
+  AccreditationRevoked,
+  Locked
 } from "../generated/PharmaTraceAttestation/PharmaTraceAttestation";
 import {
+  BondLocked,
+  BondReleased,
+  BondSlashed
+} from "../generated/CarrierStakingEscrow/CarrierStakingEscrow";
+import {
+  ProofVerified
+} from "../generated/ZkColdChainVerifier/ZkColdChainVerifier";
+import {
+  PolicyRegistered,
+  ExcursionDetected,
+  ExcursionResolved,
+  AutomationSlashTriggered
+} from "../generated/ColdChainAutomationOracle/ColdChainAutomationOracle";
+import {
   DigitalTwin,
+  BatchTwin,
   CustodyTransfer,
   EscrowOrder,
   Attestation,
   BatchAnchor,
-  Accreditation
+  Accreditation,
+  CarrierBond,
+  ZkColdChainRecord,
+  ColdChainTelemetryEvent
 } from "../generated/schema";
 
 function sanitizeString(value: string, maxLen: number): string {
@@ -63,6 +85,19 @@ export function handleItemMinted(event: ItemMinted): void {
   twin.isBurned = false;
   twin.mintedAt = event.block.timestamp;
   twin.save();
+}
+
+export function handleBatchTwinMinted(event: BatchTwinMinted): void {
+  let id = event.params.batchTokenId.toHexString();
+  let batch = new BatchTwin(id);
+  batch.batchTokenId = event.params.batchTokenId;
+  batch.batchNumber = sanitizeString(event.params.batchNumber, 64);
+  batch.manufacturer = event.params.manufacturer;
+  batch.totalUnits = event.params.totalUnits;
+  batch.mintedAt = event.block.timestamp;
+  batch.blockNumber = event.block.number;
+  batch.transactionHash = event.transaction.hash;
+  batch.save();
 }
 
 export function handleCustodyTransferred(event: CustodyTransferred): void {
@@ -185,6 +220,16 @@ export function handleBatchAnchored(event: BatchAnchored): void {
   batch.save();
 }
 
+export function handleBatchRevoked(event: BatchRevoked): void {
+  let id = event.params.merkleRoot.toHexString();
+  let batch = BatchAnchor.load(id);
+  if (batch) {
+    batch.isRevoked = true;
+    batch.revocationReason = sanitizeString(event.params.reason, 256);
+    batch.save();
+  }
+}
+
 export function handleAccreditationIssued(event: AccreditationIssued): void {
   let id = event.params.tokenId.toHexString();
   let acc = new Accreditation(id);
@@ -201,4 +246,123 @@ export function handleAccreditationIssued(event: AccreditationIssued): void {
   acc.blockNumber = event.block.number;
   acc.transactionHash = event.transaction.hash;
   acc.save();
+}
+
+export function handleAccreditationRevoked(event: AccreditationRevoked): void {
+  let id = event.params.tokenId.toHexString();
+  let acc = Accreditation.load(id);
+  if (acc) {
+    acc.isRevoked = true;
+    acc.revocationReason = sanitizeString(event.params.reason, 256);
+    acc.save();
+  }
+}
+
+export function handleAccreditationLocked(event: Locked): void {
+  let id = event.params.tokenId.toHexString();
+  let acc = Accreditation.load(id);
+  if (acc) {
+    acc.isLocked = true;
+    acc.save();
+  }
+}
+
+export function handleBondLocked(event: BondLocked): void {
+  let id = event.params.shipmentId.toHexString();
+  let bond = new CarrierBond(id);
+  bond.shipmentId = event.params.shipmentId;
+  bond.carrier = event.params.carrier;
+  bond.manufacturer = event.params.manufacturer;
+  bond.bondAmount = event.params.bondAmount;
+  bond.status = "LOCKED";
+  bond.lockedAt = event.block.timestamp;
+  bond.blockNumber = event.block.number;
+  bond.transactionHash = event.transaction.hash;
+  bond.save();
+}
+
+export function handleBondReleased(event: BondReleased): void {
+  let id = event.params.shipmentId.toHexString();
+  let bond = CarrierBond.load(id);
+  if (bond) {
+    bond.status = "RELEASED";
+    bond.resolvedAt = event.block.timestamp;
+    bond.resolutionReason = "RELEASED_UPON_SAFE_DELIVERY";
+    bond.save();
+  }
+}
+
+export function handleBondSlashed(event: BondSlashed): void {
+  let id = event.params.shipmentId.toHexString();
+  let bond = CarrierBond.load(id);
+  if (bond) {
+    bond.status = "SLASHED";
+    bond.slashedAmount = event.params.slashedAmount;
+    bond.resolutionReason = sanitizeString(event.params.excursionReason, 256);
+    bond.consensusReportHash = event.params.consensusReportHash;
+    bond.resolvedAt = event.block.timestamp;
+    bond.save();
+  }
+}
+
+export function handleProofVerified(event: ProofVerified): void {
+  let id = event.params.batchHash.toHexString() + "-" + event.logIndex.toString();
+  let zk = new ZkColdChainRecord(id);
+  zk.batchHash = event.params.batchHash;
+  zk.isCompliant = event.params.isCompliant;
+  zk.minTemp = event.params.minTemp;
+  zk.maxTemp = event.params.maxTemp;
+  zk.verifiedAt = event.params.verifiedAt;
+  zk.blockNumber = event.block.number;
+  zk.transactionHash = event.transaction.hash;
+  zk.save();
+}
+
+export function handlePolicyRegistered(event: PolicyRegistered): void {
+  let id = event.transaction.hash.toHexString() + "-" + event.logIndex.toString();
+  let telemetry = new ColdChainTelemetryEvent(id);
+  telemetry.shipmentId = event.params.shipmentId;
+  telemetry.eventType = "POLICY_REGISTERED";
+  telemetry.minTemp = event.params.minTemp;
+  telemetry.maxTemp = event.params.maxTemp;
+  telemetry.timestamp = event.block.timestamp;
+  telemetry.blockNumber = event.block.number;
+  telemetry.transactionHash = event.transaction.hash;
+  telemetry.save();
+}
+
+export function handleExcursionDetected(event: ExcursionDetected): void {
+  let id = event.transaction.hash.toHexString() + "-" + event.logIndex.toString();
+  let telemetry = new ColdChainTelemetryEvent(id);
+  telemetry.shipmentId = event.params.shipmentId;
+  telemetry.eventType = "EXCURSION_DETECTED";
+  telemetry.recordedTemp = event.params.recordedTemp;
+  telemetry.timestamp = event.params.timestamp;
+  telemetry.blockNumber = event.block.number;
+  telemetry.transactionHash = event.transaction.hash;
+  telemetry.save();
+}
+
+export function handleExcursionResolved(event: ExcursionResolved): void {
+  let id = event.transaction.hash.toHexString() + "-" + event.logIndex.toString();
+  let telemetry = new ColdChainTelemetryEvent(id);
+  telemetry.shipmentId = event.params.shipmentId;
+  telemetry.eventType = "EXCURSION_RESOLVED";
+  telemetry.timestamp = event.params.timestamp;
+  telemetry.blockNumber = event.block.number;
+  telemetry.transactionHash = event.transaction.hash;
+  telemetry.save();
+}
+
+export function handleAutomationSlashTriggered(event: AutomationSlashTriggered): void {
+  let id = event.transaction.hash.toHexString() + "-" + event.logIndex.toString();
+  let telemetry = new ColdChainTelemetryEvent(id);
+  telemetry.shipmentId = event.params.shipmentId;
+  telemetry.eventType = "SLASH_TRIGGERED";
+  telemetry.slashPercentage = event.params.slashPercentage;
+  telemetry.reason = sanitizeString(event.params.reason, 256);
+  telemetry.timestamp = event.block.timestamp;
+  telemetry.blockNumber = event.block.number;
+  telemetry.transactionHash = event.transaction.hash;
+  telemetry.save();
 }
