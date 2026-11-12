@@ -83,6 +83,17 @@ describe('AuthService - Admin Moderation Safeguards', () => {
         sendPasswordResetOtp: jest.fn().mockResolvedValue(true),
     };
 
+    const mockInvitationRepository = {
+        findOne: jest.fn().mockResolvedValue(null),
+        save: jest.fn().mockResolvedValue({}),
+    };
+
+    const mockRedisService = {
+        set: jest.fn().mockResolvedValue(true),
+        get: jest.fn().mockResolvedValue(null),
+        del: jest.fn().mockResolvedValue(true),
+    };
+
     beforeEach(() => {
         userStore = new Map<number, User>([
             [1, { ...mockAdminUser }],
@@ -92,9 +103,11 @@ describe('AuthService - Admin Moderation Safeguards', () => {
 
         service = new AuthService(
             mockUserRepository as any,
+            mockInvitationRepository as any,
             mockJwtService as any,
             mockBlockchainService as any,
             mockMailService as any,
+            mockRedisService as any,
         );
     });
 
