@@ -14,6 +14,17 @@ type DigitalTwin @entity {
   transfers: [CustodyTransfer!]! @derivedFrom(field: "twin")
 }
 
+type BatchTwin @entity {
+  id: ID!
+  batchTokenId: BigInt!
+  batchNumber: String!
+  manufacturer: Bytes!
+  totalUnits: BigInt!
+  mintedAt: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
 type CustodyTransfer @entity {
   id: ID!
   twin: DigitalTwin!
@@ -63,6 +74,7 @@ type BatchAnchor @entity {
   submitter: Bytes!
   timestamp: BigInt!
   isRevoked: Boolean!
+  revocationReason: String
   blockNumber: BigInt!
   transactionHash: Bytes!
 }
@@ -78,6 +90,7 @@ type Accreditation @entity {
   metadataCid: String!
   isRevoked: Boolean!
   isLocked: Boolean!
+  revocationReason: String
   issuedAt: BigInt!
   blockNumber: BigInt!
   transactionHash: Bytes!
@@ -106,6 +119,20 @@ type ZkColdChainRecord @entity {
   minTemp: BigInt!
   maxTemp: BigInt!
   verifiedAt: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type ColdChainTelemetryEvent @entity {
+  id: ID!
+  shipmentId: Bytes!
+  eventType: String!
+  recordedTemp: BigInt
+  minTemp: BigInt
+  maxTemp: BigInt
+  slashPercentage: BigInt
+  reason: String
+  timestamp: BigInt!
   blockNumber: BigInt!
   transactionHash: Bytes!
 }
