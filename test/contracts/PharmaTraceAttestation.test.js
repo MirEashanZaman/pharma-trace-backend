@@ -84,7 +84,7 @@ describe("PharmaTraceAttestation UUPS Upgradeable Proxy", function () {
 
       await expect(
         attestation.connect(unauthorized).upgradeToAndCall(await newImpl.getAddress(), "0x")
-      ).to.be.revertedWith("Only owner can perform this action");
+      ).to.be.revertedWithCustomError(attestation, "OnlyOwnerAuthorized");
     });
   });
 });
