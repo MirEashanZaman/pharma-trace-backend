@@ -29,6 +29,7 @@ import { EpcisQueryService } from './epcis/epcis-query.service';
 import { EpcisQueryController } from './epcis/epcis-query.controller';
 import { CarrierStakingService } from './escrow/carrier-staking.service';
 import { CarrierStakingController } from './escrow/carrier-staking.controller';
+import { SubgraphService } from './subgraph/subgraph.service';
 
 @Module({
     controllers: [
@@ -64,6 +65,7 @@ import { CarrierStakingController } from './escrow/carrier-staking.controller';
         VerifiableCredentialService,
         EpcisQueryService,
         CarrierStakingService,
+        SubgraphService,
     ],
     exports: [
         BlockchainService,
@@ -89,6 +91,7 @@ import { CarrierStakingController } from './escrow/carrier-staking.controller';
         VerifiableCredentialService,
         EpcisQueryService,
         CarrierStakingService,
+        SubgraphService,
     ],
 })
 export class BlockchainModule {}
