@@ -1,0 +1,21 @@
+{
+  "name": "pharma-trace-subgraph",
+  "version": "1.0.0",
+  "description": "The Graph Protocol Subgraph for PharmaTrace pharmaceutical provenance indexing",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy:local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001/ pharma-trace/subgraph",
+    "deploy:studio": "graph deploy --studio pharma-trace",
+    "create:local": "graph create --node http://localhost:8020/ pharma-trace/subgraph",
+    "remove:local": "graph remove --node http://localhost:8020/ pharma-trace/subgraph",
+    "test:types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-ts": "^0.32.0"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.68.0",
+    "typescript": "^5.7.3"
+  }
+}
