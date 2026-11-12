@@ -14,14 +14,20 @@ interface ICarrierStakingEscrow {
 }
 
 contract ColdChainAutomationOracle is Ownable, ReentrancyGuard {
+    error InvalidEscrowAddress();
+    error PolicyAlreadyExists();
+    error PolicyNotRegistered();
+    error NoActiveBreach();
+    error ExcursionDurationBelowThreshold();
+
     ICarrierStakingEscrow public escrowContract;
 
     struct ColdChainPolicy {
         bytes32 shipmentId;
-        int256 minTempHundredths;
-        int256 maxTempHundredths;
-        uint256 maxExcursionDurationSeconds;
-        uint256 excursionStartTime;
+        int128 minTempHundredths;
+        int128 maxTempHundredths;
+        uint64 maxExcursionDurationSeconds;
+        uint64 excursionStartTime;
         bool hasExcursion;
         bool isSlashed;
     }
@@ -35,12 +41,12 @@ contract ColdChainAutomationOracle is Ownable, ReentrancyGuard {
     event AutomationSlashTriggered(bytes32 indexed shipmentId, uint256 slashPercentage, string reason);
 
     constructor(address _escrowContract) Ownable(msg.sender) {
-        require(_escrowContract != address(0), "Invalid escrow address");
+        if (_escrowContract == address(0)) revert InvalidEscrowAddress();
         escrowContract = ICarrierStakingEscrow(_escrowContract);
     }
 
     function setEscrowContract(address _escrowContract) external onlyOwner {
-        require(_escrowContract != address(0), "Invalid address");
+        if (_escrowContract == address(0)) revert InvalidEscrowAddress();
         escrowContract = ICarrierStakingEscrow(_escrowContract);
     }
 
@@ -50,12 +56,12 @@ contract ColdChainAutomationOracle is Ownable, ReentrancyGuard {
         int256 maxTempHundredths,
         uint256 maxExcursionDurationSeconds
     ) external onlyOwner {
-        require(policies[shipmentId].minTempHundredths == 0 && policies[shipmentId].maxTempHundredths == 0, "Policy already exists");
+        if (policies[shipmentId].minTempHundredths != 0 || policies[shipmentId].maxTempHundredths != 0) revert PolicyAlreadyExists();
         policies[shipmentId] = ColdChainPolicy({
             shipmentId: shipmentId,
-            minTempHundredths: minTempHundredths,
-            maxTempHundredths: maxTempHundredths,
-            maxExcursionDurationSeconds: maxExcursionDurationSeconds,
+            minTempHundredths: int128(minTempHundredths),
+            maxTempHundredths: int128(maxTempHundredths),
+            maxExcursionDurationSeconds: uint64(maxExcursionDurationSeconds),
             excursionStartTime: 0,
             hasExcursion: false,
             isSlashed: false
@@ -70,7 +76,7 @@ contract ColdChainAutomationOracle is Ownable, ReentrancyGuard {
         uint256 timestamp
     ) external onlyOwner {
         ColdChainPolicy storage policy = policies[shipmentId];
-        require(policy.minTempHundredths != 0 || policy.maxTempHundredths != 0, "Shipment policy not registered");
+        if (policy.minTempHundredths == 0 && policy.maxTempHundredths == 0) revert PolicyNotRegistered();
         if (policy.isSlashed) return;
 
         bool outOfBounds = (currentTempHundredths < policy.minTempHundredths || currentTempHundredths > policy.maxTempHundredths);
@@ -78,7 +84,7 @@ contract ColdChainAutomationOracle is Ownable, ReentrancyGuard {
         if (outOfBounds) {
             if (!policy.hasExcursion) {
                 policy.hasExcursion = true;
-                policy.excursionStartTime = timestamp;
+                policy.excursionStartTime = uint64(timestamp);
                 emit ExcursionDetected(shipmentId, currentTempHundredths, timestamp);
             }
         } else {
@@ -106,8 +112,8 @@ contract ColdChainAutomationOracle is Ownable, ReentrancyGuard {
     function performUpkeep(bytes calldata performData) external nonReentrant {
         bytes32 shipmentId = abi.decode(performData, (bytes32));
         ColdChainPolicy storage policy = policies[shipmentId];
-        require(policy.hasExcursion && !policy.isSlashed, "No active breach requiring slash");
-        require(block.timestamp >= policy.excursionStartTime + policy.maxExcursionDurationSeconds, "Excursion duration below threshold");
+        if (!policy.hasExcursion || policy.isSlashed) revert NoActiveBreach();
+        if (block.timestamp < policy.excursionStartTime + policy.maxExcursionDurationSeconds) revert ExcursionDurationBelowThreshold();
 
         policy.isSlashed = true;
         bytes32 consensusHash = keccak256(abi.encodePacked(shipmentId, block.timestamp, "CHAINLINK_AUTOMATION"));
