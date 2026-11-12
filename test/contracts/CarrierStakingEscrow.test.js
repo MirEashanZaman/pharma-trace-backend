@@ -57,7 +57,7 @@ describe("CarrierStakingEscrow Contract", function () {
     it("should reject staking zero tokens", async function () {
       await expect(
         stakingEscrow.connect(carrier).stakeCollateral(0n)
-      ).to.be.revertedWith("Amount must be greater than zero");
+      ).to.be.revertedWithCustomError(stakingEscrow, "AmountMustBeGreaterThanZero");
     });
 
     it("should reject staking when allowance is insufficient", async function () {
@@ -104,7 +104,7 @@ describe("CarrierStakingEscrow Contract", function () {
       const excessiveUnstake = ethers.parseEther("20000");
       await expect(
         stakingEscrow.connect(carrier).unstakeCollateral(excessiveUnstake)
-      ).to.be.revertedWith("Insufficient unlocked collateral");
+      ).to.be.revertedWithCustomError(stakingEscrow, "InsufficientUnlockedCollateral");
     });
   });
 
@@ -146,7 +146,7 @@ describe("CarrierStakingEscrow Contract", function () {
           manufacturer.address,
           sampleBondAmount
         )
-      ).to.be.revertedWith("Only owner authorized");
+      ).to.be.revertedWithCustomError(stakingEscrow, "OnlyOwnerAuthorized");
     });
 
     it("should reject locking bond for unaccredited carrier", async function () {
@@ -157,7 +157,7 @@ describe("CarrierStakingEscrow Contract", function () {
           manufacturer.address,
           sampleBondAmount
         )
-      ).to.be.revertedWith("Carrier not accredited");
+      ).to.be.revertedWithCustomError(stakingEscrow, "CarrierNotAccredited");
     });
 
     it("should reject locking bond exceeding available carrier collateral", async function () {
@@ -169,7 +169,7 @@ describe("CarrierStakingEscrow Contract", function () {
           manufacturer.address,
           excessiveBond
         )
-      ).to.be.revertedWith("Insufficient available collateral");
+      ).to.be.revertedWithCustomError(stakingEscrow, "InsufficientAvailableCollateral");
     });
 
     it("should reject duplicate bond creation for same shipment identifier", async function () {
@@ -187,7 +187,7 @@ describe("CarrierStakingEscrow Contract", function () {
           manufacturer.address,
           sampleBondAmount
         )
-      ).to.be.revertedWith("Bond already exists for shipment");
+      ).to.be.revertedWithCustomError(stakingEscrow, "BondAlreadyExists");
     });
   });
 
@@ -224,7 +224,7 @@ describe("CarrierStakingEscrow Contract", function () {
 
       await expect(
         stakingEscrow.connect(owner).releaseShipmentBond(sampleShipmentId)
-      ).to.be.revertedWith("Bond is not locked");
+      ).to.be.revertedWithCustomError(stakingEscrow, "BondNotLocked");
     });
 
     it("should slash bond and indemnify manufacturer on cold-chain excursion breach", async function () {
@@ -285,11 +285,11 @@ describe("CarrierStakingEscrow Contract", function () {
     it("should reject slashing with invalid percentage bounds", async function () {
       await expect(
         stakingEscrow.connect(owner).slashShipmentBond(sampleShipmentId, 0n, "Zero slash", sampleConsensusHash)
-      ).to.be.revertedWith("Invalid slash percentage");
+      ).to.be.revertedWithCustomError(stakingEscrow, "InvalidSlashPercentage");
 
       await expect(
         stakingEscrow.connect(owner).slashShipmentBond(sampleShipmentId, 101n, "Over 100", sampleConsensusHash)
-      ).to.be.revertedWith("Invalid slash percentage");
+      ).to.be.revertedWithCustomError(stakingEscrow, "InvalidSlashPercentage");
     });
   });
 });
