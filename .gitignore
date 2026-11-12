@@ -20,6 +20,10 @@ Desktop.ini
 *.pem
 *.key
 *.cert
+*.pfx
+*.p12
+*.keystore
+service-account*.json
 
 # IDEs
 .idea
@@ -42,6 +46,18 @@ Desktop.ini
 /artifacts
 /typechain
 /typechain-types
+*.r1cs
+*.zkey
+*.wtns
+*.sym
+*_js/
+circuits/build/*.r1cs
+circuits/build/*.zkey
+circuits/build/*.wtns
+circuits/build/*.sym
+circuits/build/*_js/
+slither-report.json
+crytic-export/
 
 # Testing
 /coverage
@@ -62,4 +78,7 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 dump.rdb
 .eslintcache
+.prettiercache
 test-results/
+**/.pio/
+**/.vscode/
