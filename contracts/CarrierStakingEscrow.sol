@@ -11,6 +11,24 @@ contract CarrierStakingEscrow is ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
+    error OnlyOwnerAuthorized();
+    error InvalidOracleAddress();
+    error OracleAlreadyAuthorized();
+    error OracleNotAuthorized();
+    error CannotReduceOracleCountBelowThreshold();
+    error InvalidConsensusThreshold();
+    error AmountMustBeGreaterThanZero();
+    error InsufficientUnlockedCollateral();
+    error BondAlreadyExists();
+    error InvalidAddresses();
+    error CarrierNotAccredited();
+    error InsufficientAvailableCollateral();
+    error BondNotLocked();
+    error InsufficientOracleSignatures();
+    error UnauthorizedOracleSigner();
+    error DuplicateOracleSignature();
+    error InvalidSlashPercentage();
+
     address public owner;
     IERC20 public immutable stakingToken;
 
@@ -27,11 +45,11 @@ contract CarrierStakingEscrow is ReentrancyGuard {
     struct ShipmentBond {
         bytes32 shipmentId;
         address carrier;
-        address manufacturer;
-        uint256 bondAmount;
         BondStatus status;
-        uint256 lockedAt;
-        uint256 resolvedAt;
+        uint64 lockedAt;
+        address manufacturer;
+        uint64 resolvedAt;
+        uint256 bondAmount;
         string resolutionReason;
     }
 
@@ -54,7 +72,7 @@ contract CarrierStakingEscrow is ReentrancyGuard {
     event ConsensusThresholdUpdated(uint256 newThreshold);
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner authorized");
+        if (msg.sender != owner) revert OnlyOwnerAuthorized();
         _;
     }
 
@@ -67,23 +85,23 @@ contract CarrierStakingEscrow is ReentrancyGuard {
     }
 
     function addOracle(address oracle) external onlyOwner {
-        require(oracle != address(0), "Invalid oracle address");
-        require(!isAuthorizedOracle[oracle], "Oracle already authorized");
+        if (oracle == address(0)) revert InvalidOracleAddress();
+        if (isAuthorizedOracle[oracle]) revert OracleAlreadyAuthorized();
         isAuthorizedOracle[oracle] = true;
         oracleCount += 1;
         emit OracleAdded(oracle);
     }
 
     function removeOracle(address oracle) external onlyOwner {
-        require(isAuthorizedOracle[oracle], "Oracle not authorized");
-        require(oracleCount > consensusThreshold, "Cannot reduce oracle count below threshold");
+        if (!isAuthorizedOracle[oracle]) revert OracleNotAuthorized();
+        if (oracleCount <= consensusThreshold) revert CannotReduceOracleCountBelowThreshold();
         isAuthorizedOracle[oracle] = false;
         oracleCount -= 1;
         emit OracleRemoved(oracle);
     }
 
     function setConsensusThreshold(uint256 threshold) external onlyOwner {
-        require(threshold > 0 && threshold <= oracleCount, "Invalid consensus threshold");
+        if (threshold == 0 || threshold > oracleCount) revert InvalidConsensusThreshold();
         consensusThreshold = threshold;
         emit ConsensusThresholdUpdated(threshold);
     }
@@ -101,7 +119,7 @@ contract CarrierStakingEscrow is ReentrancyGuard {
     }
 
     function stakeCollateral(uint256 amount) external nonReentrant {
-        require(amount > 0, "Amount must be greater than zero");
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
 
         CarrierAccount storage account = carriers[msg.sender];
@@ -113,8 +131,8 @@ contract CarrierStakingEscrow is ReentrancyGuard {
 
     function unstakeCollateral(uint256 amount) external nonReentrant {
         CarrierAccount storage account = carriers[msg.sender];
-        require(amount > 0, "Amount must be greater than zero");
-        require(account.totalStaked - account.lockedCollateral >= amount, "Insufficient unlocked collateral");
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
+        if (account.totalStaked - account.lockedCollateral < amount) revert InsufficientUnlockedCollateral();
 
         account.totalStaked -= amount;
         if (account.totalStaked == 0) {
@@ -131,21 +149,21 @@ contract CarrierStakingEscrow is ReentrancyGuard {
         address manufacturer,
         uint256 bondAmount
     ) external onlyOwner {
-        require(bonds[shipmentId].status == BondStatus.NONE, "Bond already exists for shipment");
-        require(carrier != address(0) && manufacturer != address(0), "Invalid addresses");
+        if (bonds[shipmentId].status != BondStatus.NONE) revert BondAlreadyExists();
+        if (carrier == address(0) || manufacturer == address(0)) revert InvalidAddresses();
         CarrierAccount storage account = carriers[carrier];
-        require(account.isAccredited, "Carrier not accredited");
-        require(account.totalStaked - account.lockedCollateral >= bondAmount, "Insufficient available collateral");
+        if (!account.isAccredited) revert CarrierNotAccredited();
+        if (account.totalStaked - account.lockedCollateral < bondAmount) revert InsufficientAvailableCollateral();
 
         account.lockedCollateral += bondAmount;
         bonds[shipmentId] = ShipmentBond({
             shipmentId: shipmentId,
             carrier: carrier,
-            manufacturer: manufacturer,
-            bondAmount: bondAmount,
             status: BondStatus.LOCKED,
-            lockedAt: block.timestamp,
+            lockedAt: uint64(block.timestamp),
+            manufacturer: manufacturer,
             resolvedAt: 0,
+            bondAmount: bondAmount,
             resolutionReason: ""
         });
 
@@ -156,12 +174,12 @@ contract CarrierStakingEscrow is ReentrancyGuard {
 
     function releaseShipmentBond(bytes32 shipmentId) external onlyOwner {
         ShipmentBond storage bond = bonds[shipmentId];
-        require(bond.status == BondStatus.LOCKED, "Bond is not locked");
+        if (bond.status != BondStatus.LOCKED) revert BondNotLocked();
 
         CarrierAccount storage account = carriers[bond.carrier];
         account.lockedCollateral -= bond.bondAmount;
         bond.status = BondStatus.RELEASED;
-        bond.resolvedAt = block.timestamp;
+        bond.resolvedAt = uint64(block.timestamp);
         bond.resolutionReason = "Multi-sensor consensus verified compliant cold-chain handover";
 
         _removeActiveBond(shipmentId);
@@ -185,7 +203,7 @@ contract CarrierStakingEscrow is ReentrancyGuard {
         bytes32 consensusReportHash,
         bytes[] calldata signatures
     ) external nonReentrant {
-        require(signatures.length >= consensusThreshold, "Insufficient oracle signatures for consensus");
+        if (signatures.length < consensusThreshold) revert InsufficientOracleSignatures();
 
         bytes32 messageHash = keccak256(
             abi.encodePacked(
@@ -201,9 +219,9 @@ contract CarrierStakingEscrow is ReentrancyGuard {
         address[] memory verifiedSigners = new address[](signatures.length);
         for (uint256 i = 0; i < signatures.length; i++) {
             address signer = ECDSA.recover(ethSignedMessageHash, signatures[i]);
-            require(isAuthorizedOracle[signer], "Signature signer is not an authorized oracle");
+            if (!isAuthorizedOracle[signer]) revert UnauthorizedOracleSigner();
             for (uint256 j = 0; j < i; j++) {
-                require(verifiedSigners[j] != signer, "Duplicate oracle signature detected");
+                if (verifiedSigners[j] == signer) revert DuplicateOracleSignature();
             }
             verifiedSigners[i] = signer;
         }
@@ -217,9 +235,9 @@ contract CarrierStakingEscrow is ReentrancyGuard {
         string calldata excursionReason,
         bytes32 consensusReportHash
     ) internal {
-        require(slashPercentage > 0 && slashPercentage <= 100, "Invalid slash percentage");
+        if (slashPercentage == 0 || slashPercentage > 100) revert InvalidSlashPercentage();
         ShipmentBond storage bond = bonds[shipmentId];
-        require(bond.status == BondStatus.LOCKED, "Bond is not locked");
+        if (bond.status != BondStatus.LOCKED) revert BondNotLocked();
 
         uint256 slashedAmount = (bond.bondAmount * slashPercentage) / 100;
 
@@ -230,7 +248,7 @@ contract CarrierStakingEscrow is ReentrancyGuard {
         account.totalIndemnified += slashedAmount;
 
         bond.status = BondStatus.SLASHED;
-        bond.resolvedAt = block.timestamp;
+        bond.resolvedAt = uint64(block.timestamp);
         bond.resolutionReason = excursionReason;
 
         _removeActiveBond(shipmentId);
