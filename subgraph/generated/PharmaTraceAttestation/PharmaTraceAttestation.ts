@@ -93,6 +93,35 @@ export class BatchAnchored {
   }
 }
 
+export class BatchRevoked {
+  params: {
+    merkleRoot: Bytes;
+    revoker: Bytes;
+    timestamp: BigInt;
+    reason: string;
+  };
+  block: { timestamp: BigInt; number: BigInt };
+  transaction: { hash: Bytes };
+  logIndex: BigInt;
+
+  constructor(
+    params: {
+      merkleRoot: Bytes;
+      revoker: Bytes;
+      timestamp: BigInt;
+      reason: string;
+    },
+    block: { timestamp: BigInt; number: BigInt },
+    transaction: { hash: Bytes },
+    logIndex: BigInt,
+  ) {
+    this.params = params;
+    this.block = block;
+    this.transaction = transaction;
+    this.logIndex = logIndex;
+  }
+}
+
 export class AccreditationIssued {
   params: {
     tokenId: Bytes;
@@ -116,6 +145,58 @@ export class AccreditationIssued {
       jurisdiction: string;
       validUntil: BigInt;
       metadataCid: string;
+    },
+    block: { timestamp: BigInt; number: BigInt },
+    transaction: { hash: Bytes },
+    logIndex: BigInt,
+  ) {
+    this.params = params;
+    this.block = block;
+    this.transaction = transaction;
+    this.logIndex = logIndex;
+  }
+}
+
+export class AccreditationRevoked {
+  params: {
+    tokenId: Bytes;
+    revoker: Bytes;
+    timestamp: BigInt;
+    reason: string;
+  };
+  block: { timestamp: BigInt; number: BigInt };
+  transaction: { hash: Bytes };
+  logIndex: BigInt;
+
+  constructor(
+    params: {
+      tokenId: Bytes;
+      revoker: Bytes;
+      timestamp: BigInt;
+      reason: string;
+    },
+    block: { timestamp: BigInt; number: BigInt },
+    transaction: { hash: Bytes },
+    logIndex: BigInt,
+  ) {
+    this.params = params;
+    this.block = block;
+    this.transaction = transaction;
+    this.logIndex = logIndex;
+  }
+}
+
+export class Locked {
+  params: {
+    tokenId: Bytes;
+  };
+  block: { timestamp: BigInt; number: BigInt };
+  transaction: { hash: Bytes };
+  logIndex: BigInt;
+
+  constructor(
+    params: {
+      tokenId: Bytes;
     },
     block: { timestamp: BigInt; number: BigInt },
     transaction: { hash: Bytes },
