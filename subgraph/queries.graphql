@@ -1,0 +1,155 @@
+query GetDrugProvenanceTimeline($serialNumber: String!) {
+  digitalTwins(where: { serialNumber: $serialNumber }) {
+    id
+    tokenId
+    serialNumber
+    gtin
+    batchNumber
+    currentHolder
+    status
+    isBurned
+    dispenser
+    mintedAt
+    burnedAt
+    ipfsDossierCid
+    transfers(orderBy: timestamp, orderDirection: asc) {
+      id
+      from
+      to
+      amount
+      timestamp
+      blockNumber
+      transactionHash
+    }
+  }
+  attestations(where: { drugSerialNumber: $serialNumber }, orderBy: timestamp, orderDirection: asc) {
+    id
+    dataHash
+    drugSerialNumber
+    eventType
+    signer
+    timestamp
+    isRevoked
+    revocationReason
+    metadataUri
+    transactionHash
+  }
+  escrowOrders(where: { drugSerialNumber: $serialNumber }, orderBy: createdAt, orderDirection: desc) {
+    id
+    orderId
+    buyer
+    seller
+    amountWei
+    status
+    coldChainCompliant
+    custodyAccepted
+    createdAt
+    settledAt
+    refundReason
+    transactionHash
+  }
+}
+
+query GetDigitalTwinWithCustodyHistory($serialNumber: String!) {
+  digitalTwins(where: { serialNumber: $serialNumber }) {
+    id
+    tokenId
+    serialNumber
+    gtin
+    batchNumber
+    currentHolder
+    status
+    isBurned
+    dispenser
+    mintedAt
+    burnedAt
+    ipfsDossierCid
+    transfers(orderBy: timestamp, orderDirection: asc) {
+      id
+      from
+      to
+      amount
+      timestamp
+      blockNumber
+      transactionHash
+    }
+  }
+}
+
+query GetEscrowOrderWithCompliance($orderId: ID!) {
+  escrowOrder(id: $orderId) {
+    id
+    orderId
+    buyer
+    seller
+    amountWei
+    drugSerialNumber
+    status
+    coldChainCompliant
+    custodyAccepted
+    createdAt
+    settledAt
+    refundReason
+    transactionHash
+  }
+}
+
+query GetCarrierBondsAndAccreditations($carrier: Bytes!) {
+  carrierBonds(where: { carrier: $carrier }, orderBy: lockedAt, orderDirection: desc) {
+    id
+    shipmentId
+    carrier
+    manufacturer
+    bondAmount
+    status
+    lockedAt
+    resolvedAt
+    resolutionReason
+    slashedAmount
+    consensusReportHash
+    transactionHash
+  }
+  accreditations(where: { recipient: $carrier }, orderBy: issuedAt, orderDirection: desc) {
+    id
+    tokenId
+    recipient
+    issuer
+    accreditationType
+    jurisdiction
+    validUntil
+    metadataCid
+    isRevoked
+    isLocked
+    issuedAt
+    transactionHash
+  }
+}
+
+query GetZkColdChainVerificationHistory($batchHash: Bytes!) {
+  zkColdChainRecords(where: { batchHash: $batchHash }, orderBy: verifiedAt, orderDirection: desc) {
+    id
+    batchHash
+    isCompliant
+    minTemp
+    maxTemp
+    verifiedAt
+    blockNumber
+    transactionHash
+  }
+}
+
+query GetColdChainTelemetryExcursions($shipmentId: Bytes!) {
+  coldChainTelemetryEvents(where: { shipmentId: $shipmentId }, orderBy: timestamp, orderDirection: asc) {
+    id
+    shipmentId
+    eventType
+    recordedTemp
+    minTemp
+    maxTemp
+    slashPercentage
+    reason
+    timestamp
+    blockNumber
+    transactionHash
+  }
+}
