@@ -12,6 +12,7 @@ import { DidResolverService } from './did/did-resolver.service';
 import { EpcisJsonLdService } from './epcis/epcis-jsonld.service';
 import { SensorConsensusEngine } from '../iot/consensus/sensor-consensus.engine';
 import { BatchAttestationEngine } from './merkle/batch-attestation.engine';
+import { SubgraphService } from './subgraph/subgraph.service';
 
 describe('BlockchainModule Integration', () => {
     let service: BlockchainService;
@@ -33,6 +34,7 @@ describe('BlockchainModule Integration', () => {
                 SensorConsensusEngine,
                 BundlerService,
                 BatchAttestationEngine,
+                SubgraphService,
             ],
         }).compile();
 
