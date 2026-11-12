@@ -23,6 +23,7 @@ import { DigitalTwinService } from './digital-twin/digital-twin.service';
 import { PharmaEscrowService } from './escrow/pharma-escrow.service';
 import { DidResolverService } from './did/did-resolver.service';
 import { EpcisJsonLdService } from './epcis/epcis-jsonld.service';
+import { SubgraphService } from './subgraph/subgraph.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -79,6 +80,7 @@ export class BlockchainController {
         private readonly epcisJsonLdService: EpcisJsonLdService,
         private readonly bundlerService: BundlerService,
         private readonly batchAttestationEngine: BatchAttestationEngine,
+        private readonly subgraphService: SubgraphService,
     ) {}
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -424,6 +426,43 @@ export class BlockchainController {
             leaf: body.leaf,
             merkleRoot: body.merkleRoot,
         };
+    }
+
+    @Get('subgraph/provenance/:serialNumber')
+    async getIndexedProvenance(@Param('serialNumber') serialNumber: string) {
+        return this.subgraphService.getDrugProvenanceTimeline(serialNumber);
+    }
+
+    @Get('subgraph/twin/:serialNumber')
+    async getIndexedDigitalTwin(@Param('serialNumber') serialNumber: string) {
+        return this.subgraphService.getDigitalTwinWithCustodyHistory(serialNumber);
+    }
+
+    @Get('subgraph/escrow/:orderId')
+    async getIndexedEscrowOrder(@Param('orderId') orderId: string) {
+        return this.subgraphService.getEscrowOrderWithCompliance(orderId);
+    }
+
+    @Get('subgraph/carrier/:carrier')
+    async getIndexedCarrierBonds(@Param('carrier') carrier: string) {
+        return this.subgraphService.getCarrierBondsAndAccreditations(carrier);
+    }
+
+    @Get('subgraph/zk-coldchain/:batchHash')
+    async getIndexedZkRecords(@Param('batchHash') batchHash: string) {
+        return this.subgraphService.getZkColdChainVerificationHistory(batchHash);
+    }
+
+    @Get('subgraph/telemetry/:shipmentId')
+    async getIndexedTelemetry(@Param('shipmentId') shipmentId: string) {
+        return this.subgraphService.getColdChainTelemetryExcursions(shipmentId);
+    }
+
+    @Post('subgraph/query')
+    async executeCustomSubgraphQuery(
+        @Body() body: { query: string; variables?: Record<string, any> }
+    ) {
+        return this.subgraphService.executeQuery(body.query, body.variables);
     }
 }
 
