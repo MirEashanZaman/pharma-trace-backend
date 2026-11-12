@@ -11,12 +11,22 @@ export class JwtAuthGuard implements CanActivate {
             return true;
         }
 
+        let token = '';
         const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            throw new UnauthorizedException('Missing or invalid bearer token');
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.slice(7).trim();
+        } else if (req.cookies && req.cookies.pharma_access_token) {
+            token = String(req.cookies.pharma_access_token).trim();
+        } else if (typeof req.headers.cookie === 'string') {
+            const match = req.headers.cookie.match(/(?:^|;\s*)pharma_access_token=([^;]+)/);
+            if (match) {
+                token = decodeURIComponent(match[1]).trim();
+            }
         }
 
-        const token = authHeader.slice(7).trim();
+        if (!token) {
+            throw new UnauthorizedException('Missing or invalid session credentials');
+        }
         try {
             const parts = token.split('.');
             if (parts.length !== 3) {
