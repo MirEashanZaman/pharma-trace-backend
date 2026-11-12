@@ -11,6 +11,24 @@ interface IERC5192 {
 }
 
 contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
+    error OnlyOwnerAuthorized();
+    error ContractPaused();
+    error ContractNotPaused();
+    error Unauthorized();
+    error InvalidInitialOwner();
+    error InvalidDataHash();
+    error AttestationAlreadyExists();
+    error InvalidMerkleRoot();
+    error InvalidBatchSize();
+    error BatchAlreadyAnchored();
+    error BatchNotFound();
+    error AlreadyRevoked();
+    error AttestationNotFound();
+    error InvalidRecipientAddress();
+    error ExpirationMustBeInFuture();
+    error TokenIdCollision();
+    error AccreditationNotFound();
+
     bytes32 public constant REGULATOR_ROLE = keccak256("REGULATOR_ROLE");
     bytes32 public constant MANUFACTURER_ROLE = keccak256("MANUFACTURER_ROLE");
     bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
@@ -18,33 +36,33 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
 
     struct Attestation {
         bytes32 dataHash;
+        address signer;
+        uint64 blockTimestamp;
+        bool isRevoked;
         string drugSerialNumber;
         string eventType;
-        address signer;
-        uint256 blockTimestamp;
-        bool isRevoked;
         string metadataUri;
     }
 
     struct BatchRecord {
         bytes32 merkleRoot;
+        address submitter;
+        uint64 blockTimestamp;
+        bool isRevoked;
         uint32 batchSize;
         string ipfsCid;
-        address submitter;
-        uint256 blockTimestamp;
-        bool isRevoked;
     }
 
     struct Accreditation {
         bytes32 tokenId;
         address recipient;
-        address issuer;
-        string accreditationType;
-        string jurisdiction;
-        uint256 issuedAt;
-        uint256 validUntil;
+        uint64 validUntil;
         bool locked;
         bool revoked;
+        address issuer;
+        uint64 issuedAt;
+        string accreditationType;
+        string jurisdiction;
         string metadataCid;
     }
 
@@ -124,17 +142,17 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
     event Unpaused(address indexed account);
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can perform this action");
+        if (msg.sender != owner) revert OnlyOwnerAuthorized();
         _;
     }
 
     modifier whenNotPaused() {
-        require(!paused, "Contract is currently paused");
+        if (paused) revert ContractPaused();
         _;
     }
 
     modifier whenPaused() {
-        require(paused, "Contract is not paused");
+        if (!paused) revert ContractNotPaused();
         _;
     }
 
@@ -143,7 +161,7 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
     }
 
     function initialize(address initialOwner) external initializer {
-        require(initialOwner != address(0), "Invalid initial owner");
+        if (initialOwner == address(0)) revert InvalidInitialOwner();
         owner = initialOwner;
         roles[REGULATOR_ROLE][initialOwner] = true;
         roles[MANUFACTURER_ROLE][initialOwner] = true;
@@ -154,15 +172,15 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function pause() external {
-        require(msg.sender == owner || roles[REGULATOR_ROLE][msg.sender], "Unauthorized to pause contract");
-        require(!paused, "Already paused");
+        if (msg.sender != owner && !roles[REGULATOR_ROLE][msg.sender]) revert Unauthorized();
+        if (paused) revert ContractPaused();
         paused = true;
         emit Paused(msg.sender);
     }
 
     function unpause() external {
-        require(msg.sender == owner || roles[REGULATOR_ROLE][msg.sender], "Unauthorized to unpause contract");
-        require(paused, "Not paused");
+        if (msg.sender != owner && !roles[REGULATOR_ROLE][msg.sender]) revert Unauthorized();
+        if (!paused) revert ContractNotPaused();
         paused = false;
         emit Unpaused(msg.sender);
     }
@@ -187,24 +205,23 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
         string calldata eventType,
         string calldata metadataUri
     ) external whenNotPaused returns (bool) {
-        require(
-            msg.sender == owner ||
-            roles[MANUFACTURER_ROLE][msg.sender] ||
-            roles[DISTRIBUTOR_ROLE][msg.sender] ||
-            roles[DISPENSER_ROLE][msg.sender] ||
-            roles[REGULATOR_ROLE][msg.sender],
-            "Caller not authorized with attestation role"
-        );
-        require(dataHash != bytes32(0), "Invalid data hash");
-        require(attestations[dataHash].blockTimestamp == 0, "Attestation already exists");
+        if (
+            msg.sender != owner &&
+            !roles[MANUFACTURER_ROLE][msg.sender] &&
+            !roles[DISTRIBUTOR_ROLE][msg.sender] &&
+            !roles[DISPENSER_ROLE][msg.sender] &&
+            !roles[REGULATOR_ROLE][msg.sender]
+        ) revert Unauthorized();
+        if (dataHash == bytes32(0)) revert InvalidDataHash();
+        if (attestations[dataHash].blockTimestamp != 0) revert AttestationAlreadyExists();
 
         attestations[dataHash] = Attestation({
             dataHash: dataHash,
+            signer: msg.sender,
+            blockTimestamp: uint64(block.timestamp),
+            isRevoked: false,
             drugSerialNumber: drugSerialNumber,
             eventType: eventType,
-            signer: msg.sender,
-            blockTimestamp: block.timestamp,
-            isRevoked: false,
             metadataUri: metadataUri
         });
 
@@ -227,23 +244,22 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
         uint32 batchSize,
         string calldata ipfsCid
     ) external whenNotPaused returns (bool) {
-        require(
-            msg.sender == owner ||
-            roles[MANUFACTURER_ROLE][msg.sender] ||
-            roles[REGULATOR_ROLE][msg.sender],
-            "Caller not authorized with batch anchor role"
-        );
-        require(merkleRoot != bytes32(0), "Invalid Merkle root");
-        require(batchSize > 0, "Batch size must be greater than zero");
-        require(batches[merkleRoot].blockTimestamp == 0, "Batch root already anchored");
+        if (
+            msg.sender != owner &&
+            !roles[MANUFACTURER_ROLE][msg.sender] &&
+            !roles[REGULATOR_ROLE][msg.sender]
+        ) revert Unauthorized();
+        if (merkleRoot == bytes32(0)) revert InvalidMerkleRoot();
+        if (batchSize == 0) revert InvalidBatchSize();
+        if (batches[merkleRoot].blockTimestamp != 0) revert BatchAlreadyAnchored();
 
         batches[merkleRoot] = BatchRecord({
             merkleRoot: merkleRoot,
-            batchSize: batchSize,
-            ipfsCid: ipfsCid,
             submitter: msg.sender,
-            blockTimestamp: block.timestamp,
-            isRevoked: false
+            blockTimestamp: uint64(block.timestamp),
+            isRevoked: false,
+            batchSize: batchSize,
+            ipfsCid: ipfsCid
         });
 
         emit BatchAnchored(
@@ -297,18 +313,15 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
             record.batchSize,
             record.ipfsCid,
             record.submitter,
-            record.blockTimestamp
+            uint256(record.blockTimestamp)
         );
     }
 
     function revokeBatch(bytes32 merkleRoot, string calldata reason) external whenNotPaused {
         BatchRecord storage record = batches[merkleRoot];
-        require(record.blockTimestamp > 0, "Batch not found");
-        require(
-            msg.sender == record.submitter || msg.sender == owner || roles[REGULATOR_ROLE][msg.sender],
-            "Unauthorized to revoke batch"
-        );
-        require(!record.isRevoked, "Already revoked");
+        if (record.blockTimestamp == 0) revert BatchNotFound();
+        if (msg.sender != record.submitter && msg.sender != owner && !roles[REGULATOR_ROLE][msg.sender]) revert Unauthorized();
+        if (record.isRevoked) revert AlreadyRevoked();
 
         record.isRevoked = true;
         emit BatchRevoked(merkleRoot, msg.sender, block.timestamp, reason);
@@ -316,12 +329,9 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
 
     function revokeAttestation(bytes32 dataHash, string calldata reason) external whenNotPaused {
         Attestation storage record = attestations[dataHash];
-        require(record.blockTimestamp > 0, "Attestation not found");
-        require(
-            msg.sender == record.signer || msg.sender == owner || roles[REGULATOR_ROLE][msg.sender],
-            "Unauthorized to revoke"
-        );
-        require(!record.isRevoked, "Already revoked");
+        if (record.blockTimestamp == 0) revert AttestationNotFound();
+        if (msg.sender != record.signer && msg.sender != owner && !roles[REGULATOR_ROLE][msg.sender]) revert Unauthorized();
+        if (record.isRevoked) revert AlreadyRevoked();
 
         record.isRevoked = true;
 
@@ -352,7 +362,7 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
             record.drugSerialNumber,
             record.eventType,
             record.signer,
-            record.blockTimestamp,
+            uint256(record.blockTimestamp),
             record.metadataUri
         );
     }
@@ -393,28 +403,25 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
         uint256 validUntil,
         string calldata metadataCid
     ) external whenNotPaused returns (bytes32) {
-        require(
-            msg.sender == owner || roles[REGULATOR_ROLE][msg.sender],
-            "Caller not authorized to issue regulatory accreditation"
-        );
-        require(recipient != address(0), "Invalid recipient address");
-        require(validUntil > block.timestamp, "Expiration must be in the future");
+        if (msg.sender != owner && !roles[REGULATOR_ROLE][msg.sender]) revert Unauthorized();
+        if (recipient == address(0)) revert InvalidRecipientAddress();
+        if (validUntil <= block.timestamp) revert ExpirationMustBeInFuture();
 
         bytes32 tokenId = keccak256(
             abi.encodePacked(recipient, accreditationType, block.timestamp, block.prevrandao)
         );
-        require(accreditations[tokenId].issuedAt == 0, "Token ID collision");
+        if (accreditations[tokenId].issuedAt != 0) revert TokenIdCollision();
 
         accreditations[tokenId] = Accreditation({
             tokenId: tokenId,
             recipient: recipient,
-            issuer: msg.sender,
-            accreditationType: accreditationType,
-            jurisdiction: jurisdiction,
-            issuedAt: block.timestamp,
-            validUntil: validUntil,
+            validUntil: uint64(validUntil),
             locked: true,
             revoked: false,
+            issuer: msg.sender,
+            issuedAt: uint64(block.timestamp),
+            accreditationType: accreditationType,
+            jurisdiction: jurisdiction,
             metadataCid: metadataCid
         });
 
@@ -437,12 +444,9 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
 
     function revokeAccreditation(bytes32 tokenId, string calldata reason) external whenNotPaused {
         Accreditation storage record = accreditations[tokenId];
-        require(record.issuedAt > 0, "Accreditation not found");
-        require(
-            msg.sender == record.issuer || msg.sender == owner || roles[REGULATOR_ROLE][msg.sender],
-            "Unauthorized to revoke accreditation"
-        );
-        require(!record.revoked, "Already revoked");
+        if (record.issuedAt == 0) revert AccreditationNotFound();
+        if (msg.sender != record.issuer && msg.sender != owner && !roles[REGULATOR_ROLE][msg.sender]) revert Unauthorized();
+        if (record.revoked) revert AlreadyRevoked();
 
         record.revoked = true;
         emit AccreditationRevoked(tokenId, msg.sender, block.timestamp, reason);
@@ -475,20 +479,20 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
             record.issuer,
             record.accreditationType,
             record.jurisdiction,
-            record.validUntil,
+            uint256(record.validUntil),
             record.metadataCid
         );
     }
 
     function locked(bytes32 tokenId) external view returns (bool) {
         Accreditation memory record = accreditations[tokenId];
-        require(record.issuedAt > 0, "Accreditation not found");
+        if (record.issuedAt == 0) revert AccreditationNotFound();
         return record.locked;
     }
 
     function locked(uint256 tokenId) external view override returns (bool) {
         Accreditation memory record = accreditations[bytes32(tokenId)];
-        require(record.issuedAt > 0, "Accreditation not found");
+        if (record.issuedAt == 0) revert AccreditationNotFound();
         return record.locked;
     }
 
@@ -516,4 +520,3 @@ contract PharmaTraceAttestation is Initializable, UUPSUpgradeable, IERC5192 {
         return false;
     }
 }
-
