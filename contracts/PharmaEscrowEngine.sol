@@ -4,6 +4,23 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract PharmaEscrowEngine is ReentrancyGuard {
+    error OnlyOwnerAuthorized();
+    error EscrowDepositZero();
+    error EscrowAlreadyExists();
+    error InvalidSellerAddress();
+    error EscrowNotFound();
+    error EscrowNotInFundedState();
+    error Unauthorized();
+    error SellerCannotSelfConfirmCustody();
+    error PayoutTransferFailed();
+    error BreachReasonRequired();
+    error CannotRefundAfterCustodyAccepted();
+    error RefundTransferFailed();
+    error EscrowNotEligibleForUpkeep();
+    error UpkeepConditionsNotMet();
+    error TimeoutNotBreached();
+    error UnknownUpkeepAction();
+
     address public owner;
 
     enum EscrowStatus { INITIALIZED, FUNDED, RELEASED, REFUNDED, DISPUTED }
@@ -11,14 +28,14 @@ contract PharmaEscrowEngine is ReentrancyGuard {
     struct EscrowOrder {
         bytes32 orderId;
         address buyer;
-        address seller;
-        uint256 amountWei;
-        string drugSerialNumber;
+        uint64 createdAt;
         EscrowStatus status;
-        uint256 createdAt;
-        uint256 timeoutTimestamp;
+        address seller;
+        uint64 timeoutTimestamp;
         bool coldChainCompliant;
         bool custodyAccepted;
+        uint256 amountWei;
+        string drugSerialNumber;
     }
 
     mapping(bytes32 => EscrowOrder) public escrows;
@@ -32,7 +49,7 @@ contract PharmaEscrowEngine is ReentrancyGuard {
     event UpkeepPerformed(bytes32 indexed orderId, uint8 actionType, uint256 timestamp);
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner authorized");
+        if (msg.sender != owner) revert OnlyOwnerAuthorized();
         _;
     }
 
@@ -58,21 +75,21 @@ contract PharmaEscrowEngine is ReentrancyGuard {
         string calldata drugSerialNumber,
         uint256 timeoutSeconds
     ) external payable returns (bool) {
-        require(msg.value > 0, "Escrow deposit must be greater than zero");
-        require(escrows[orderId].amountWei == 0, "Escrow order already exists");
-        require(seller != address(0), "Invalid seller address");
+        if (msg.value == 0) revert EscrowDepositZero();
+        if (escrows[orderId].amountWei != 0) revert EscrowAlreadyExists();
+        if (seller == address(0)) revert InvalidSellerAddress();
 
         escrows[orderId] = EscrowOrder({
             orderId: orderId,
             buyer: msg.sender,
-            seller: seller,
-            amountWei: msg.value,
-            drugSerialNumber: drugSerialNumber,
+            createdAt: uint64(block.timestamp),
             status: EscrowStatus.FUNDED,
-            createdAt: block.timestamp,
-            timeoutTimestamp: block.timestamp + timeoutSeconds,
+            seller: seller,
+            timeoutTimestamp: uint64(block.timestamp + timeoutSeconds),
             coldChainCompliant: false,
-            custodyAccepted: false
+            custodyAccepted: false,
+            amountWei: msg.value,
+            drugSerialNumber: drugSerialNumber
         });
 
         activeOrderIdIndex[orderId] = activeOrderIds.length;
@@ -88,11 +105,11 @@ contract PharmaEscrowEngine is ReentrancyGuard {
         bool custodyAccepted
     ) external nonReentrant {
         EscrowOrder storage order = escrows[orderId];
-        require(order.amountWei > 0, "Escrow not found");
-        require(order.status == EscrowStatus.FUNDED, "Escrow not in funded state");
-        require(msg.sender == owner || msg.sender == order.buyer || msg.sender == order.seller, "Unauthorized to record compliance");
+        if (order.amountWei == 0) revert EscrowNotFound();
+        if (order.status != EscrowStatus.FUNDED) revert EscrowNotInFundedState();
+        if (msg.sender != owner && msg.sender != order.buyer && msg.sender != order.seller) revert Unauthorized();
         if (msg.sender == order.seller) {
-            require(!custodyAccepted || order.custodyAccepted, "Seller cannot self-confirm custody acceptance");
+            if (custodyAccepted && !order.custodyAccepted) revert SellerCannotSelfConfirmCustody();
         }
 
         order.coldChainCompliant = coldChainCompliant;
@@ -106,19 +123,19 @@ contract PharmaEscrowEngine is ReentrancyGuard {
             uint256 payout = order.amountWei;
             order.amountWei = 0;
             (bool success, ) = payable(order.seller).call{value: payout}("");
-            require(success, "Payout transfer failed");
+            if (!success) revert PayoutTransferFailed();
             emit EscrowReleased(orderId, order.seller, payout);
         }
     }
 
     function triggerSpoilageRefund(bytes32 orderId, string calldata breachReason) external nonReentrant {
         EscrowOrder storage order = escrows[orderId];
-        require(order.amountWei > 0, "Escrow not found");
-        require(order.status == EscrowStatus.FUNDED, "Escrow not in funded state");
-        require(msg.sender == owner || msg.sender == order.buyer, "Unauthorized to trigger refund");
-        require(bytes(breachReason).length > 0, "Breach reason required");
+        if (order.amountWei == 0) revert EscrowNotFound();
+        if (order.status != EscrowStatus.FUNDED) revert EscrowNotInFundedState();
+        if (msg.sender != owner && msg.sender != order.buyer) revert Unauthorized();
+        if (bytes(breachReason).length == 0) revert BreachReasonRequired();
         if (msg.sender == order.buyer) {
-            require(!order.custodyAccepted, "Cannot trigger refund after custody acceptance");
+            if (order.custodyAccepted) revert CannotRefundAfterCustodyAccepted();
         }
 
         order.status = EscrowStatus.REFUNDED;
@@ -126,7 +143,7 @@ contract PharmaEscrowEngine is ReentrancyGuard {
         uint256 refundAmount = order.amountWei;
         order.amountWei = 0;
         (bool success, ) = payable(order.buyer).call{value: refundAmount}("");
-        require(success, "Refund transfer failed");
+        if (!success) revert RefundTransferFailed();
 
         emit EscrowRefunded(orderId, order.buyer, refundAmount, breachReason);
     }
@@ -151,30 +168,30 @@ contract PharmaEscrowEngine is ReentrancyGuard {
     function performUpkeep(bytes calldata performData) external nonReentrant {
         (bytes32 orderId, uint8 actionType) = abi.decode(performData, (bytes32, uint8));
         EscrowOrder storage order = escrows[orderId];
-        require(order.status == EscrowStatus.FUNDED && order.amountWei > 0, "Escrow not eligible for upkeep");
+        if (order.status != EscrowStatus.FUNDED || order.amountWei == 0) revert EscrowNotEligibleForUpkeep();
 
         if (actionType == 1) {
-            require(order.coldChainCompliant && order.custodyAccepted, "Upkeep conditions not met for release");
+            if (!order.coldChainCompliant || !order.custodyAccepted) revert UpkeepConditionsNotMet();
             order.status = EscrowStatus.RELEASED;
             _removeActiveOrder(orderId);
             uint256 payout = order.amountWei;
             order.amountWei = 0;
             (bool success, ) = payable(order.seller).call{value: payout}("");
-            require(success, "Automated payout transfer failed");
+            if (!success) revert PayoutTransferFailed();
             emit EscrowReleased(orderId, order.seller, payout);
             emit UpkeepPerformed(orderId, 1, block.timestamp);
         } else if (actionType == 2) {
-            require(block.timestamp > order.timeoutTimestamp, "Timeout SLA not breached");
+            if (block.timestamp <= order.timeoutTimestamp) revert TimeoutNotBreached();
             order.status = EscrowStatus.REFUNDED;
             _removeActiveOrder(orderId);
             uint256 refundAmount = order.amountWei;
             order.amountWei = 0;
             (bool success, ) = payable(order.buyer).call{value: refundAmount}("");
-            require(success, "Automated refund transfer failed");
+            if (!success) revert RefundTransferFailed();
             emit EscrowRefunded(orderId, order.buyer, refundAmount, "Chainlink Keeper SLA timeout refund");
             emit UpkeepPerformed(orderId, 2, block.timestamp);
         } else {
-            revert("Unknown upkeep action");
+            revert UnknownUpkeepAction();
         }
     }
 
@@ -186,4 +203,3 @@ contract PharmaEscrowEngine is ReentrancyGuard {
         return activeOrderIds.length;
     }
 }
-
