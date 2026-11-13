@@ -499,9 +499,9 @@ export class DrugsService implements OnModuleInit {
     ) {
         const drug = await this.getDrugBySerialNumber(serialNumber);
 
-        if (drug.prescriptionNumber || drug.dispensedAt) {
+        if (drug.dispensedAt) {
             throw new BadRequestException(
-                `Anti-Double-Dispensing Alert: Medicine unit ${serialNumber} has already been dispensed under Rx #${drug.prescriptionNumber} on ${drug.dispensedAt}. Halting dispense transaction to prevent potential counterfeit cloning or duplicate packaging.`,
+                `Anti-Double-Dispensing Alert: Medicine unit ${serialNumber} has already been dispensed under Rx #${drug.prescriptionNumber} on ${new Date(drug.dispensedAt).toLocaleDateString()}. Halting dispense transaction to prevent potential counterfeit cloning or duplicate packaging.`,
             );
         }
 
