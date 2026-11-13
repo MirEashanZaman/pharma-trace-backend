@@ -215,6 +215,11 @@ export class DrugsController {
         return this.drugsService.pharmacyDispensePrescription(serialNumber, data);
     }
 
+    @Post(':serialNumber/reset-dispense')
+    resetDispense(@Param('serialNumber') serialNumber: string) {
+        return this.drugsService.resetDispense(serialNumber);
+    }
+
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(UserRole.PHARMACY, UserRole.ADMIN)
     @Post(':serialNumber/pharmacy-retire')
