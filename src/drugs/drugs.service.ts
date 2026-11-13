@@ -536,6 +536,23 @@ export class DrugsService implements OnModuleInit {
         return updated;
     }
 
+    async resetDispense(serialNumber: string) {
+        const drug = await this.getDrugBySerialNumber(serialNumber);
+        drug.dispensedAt = null as any;
+        drug.prescriptionNumber = null as any;
+        drug.prescribingDoctor = null as any;
+        drug.patientToken = null as any;
+        drug.dispensedByPharmacist = null as any;
+        drug.dispenseNotes = null as any;
+        drug.currentCustodian = 'CVS Central Pharmacy';
+        drug.custodyLocation = 'Dispensary Vault / Refrigerator';
+        const updated = await this.drugRepository.save(drug);
+        if (this.redisService) {
+            await this.redisService.del(`drug:${serialNumber}`);
+        }
+        return updated;
+    }
+
     async pharmacyDisposeOrReturn(
         serialNumber: string,
         data: {
