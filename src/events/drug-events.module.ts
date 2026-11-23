@@ -23,41 +23,33 @@ import { LedgerModule } from '../ledger/ledger.module';
 import { BlockchainModule } from '../blockchain/blockchain.module';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([
-            DrugEvent,
-            Drug,
-        ]),
+  imports: [
+    TypeOrmModule.forFeature([DrugEvent, Drug]),
 
-        LedgerModule,
-        BlockchainModule,
-    ],
+    LedgerModule,
+    BlockchainModule,
+  ],
 
-    controllers: [
-        DrugEventsController,
-    ],
+  controllers: [DrugEventsController],
 
-    providers: [
-        DrugEventsService,
+  providers: [
+    DrugEventsService,
 
-        EventPublisher,
+    EventPublisher,
 
-        AuditObserver,
+    AuditObserver,
 
-        ManufacturedStrategy,
-        ShippedStrategy,
-        ReceivedStrategy,
-        TemperatureMonitoredStrategy,
+    ManufacturedStrategy,
+    ShippedStrategy,
+    ReceivedStrategy,
+    TemperatureMonitoredStrategy,
 
-        EventStrategyFactory,
+    EventStrategyFactory,
 
-        CustodyTransferSaga,
-        CustodyRollbackEngine,
-    ],
+    CustodyTransferSaga,
+    CustodyRollbackEngine,
+  ],
 
-    exports: [
-        DrugEventsService,
-        CustodyRollbackEngine,
-    ],
+  exports: [DrugEventsService, CustodyRollbackEngine],
 })
-export class DrugEventsModule { }
+export class DrugEventsModule {}

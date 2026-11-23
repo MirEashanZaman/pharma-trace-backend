@@ -13,18 +13,18 @@ import { BlockchainModule } from '../blockchain/blockchain.module';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([User, Invitation]),
-        PassportModule.register({ defaultStrategy: 'jwt' }),
-        JwtModule.register({
-            secret: jwtConstants.secret,
-            signOptions: { expiresIn: '7d' },
-        }),
-        BlockchainModule,
-        MailModule,
-    ],
-    controllers: [AuthController],
-    providers: [AuthService, JwtStrategy],
-    exports: [AuthService, JwtStrategy, PassportModule],
+  imports: [
+    TypeOrmModule.forFeature([User, Invitation]),
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.register({
+      secret: jwtConstants.secret,
+      signOptions: { expiresIn: '7d' },
+    }),
+    BlockchainModule,
+    MailModule,
+  ],
+  controllers: [AuthController],
+  providers: [AuthService, JwtStrategy],
+  exports: [AuthService, JwtStrategy, PassportModule],
 })
 export class AuthModule {}

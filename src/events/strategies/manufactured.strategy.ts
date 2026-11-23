@@ -4,9 +4,9 @@ import { EventStrategy } from './event.strategy';
 
 @Injectable()
 export class ManufacturedStrategy implements EventStrategy {
-    process(event: DrugEvent): void {
-        console.log(
-            `[STRATEGY] Manufactured event processed for ${event.drugSerialNumber}`,
-        );
-    }
+  process(event: DrugEvent): void {
+    console.log(
+      `[STRATEGY] Manufactured event processed for ${event.drugSerialNumber}`,
+    );
+  }
 }

@@ -1,5 +1,17 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
-import { GovernanceTimelockService, GovernanceProposal } from './governance-timelock.service';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
+import {
+  GovernanceTimelockService,
+  GovernanceProposal,
+} from './governance-timelock.service';
 
 @Controller('blockchain/governance')
 export class GovernanceController {
@@ -20,7 +32,9 @@ export class GovernanceController {
       proposals = proposals.filter((p) => p.status === status);
     }
     if (target) {
-      proposals = proposals.filter((p) => p.target.toLowerCase() === target.toLowerCase());
+      proposals = proposals.filter(
+        (p) => p.target.toLowerCase() === target.toLowerCase(),
+      );
     }
     return proposals;
   }
@@ -37,17 +51,27 @@ export class GovernanceController {
 
   @Post('confirm')
   async confirmProposal(@Body() body: any): Promise<GovernanceProposal> {
-    return this.governanceService.confirmProposal(body.proposalId, body.guardianAddress);
+    return this.governanceService.confirmProposal(
+      body.proposalId,
+      body.guardianAddress,
+    );
   }
 
   @Post('execute')
   async executeProposal(@Body() body: any) {
-    return this.governanceService.executeProposal(body.proposalId, body.executorAddress);
+    return this.governanceService.executeProposal(
+      body.proposalId,
+      body.executorAddress,
+    );
   }
 
   @Post('cancel')
   async cancelProposal(@Body() body: any): Promise<GovernanceProposal> {
-    return this.governanceService.cancelProposal(body.proposalId, body.guardianAddress, body.reason);
+    return this.governanceService.cancelProposal(
+      body.proposalId,
+      body.guardianAddress,
+      body.reason,
+    );
   }
 
   @Put('proposals/:id')
@@ -55,7 +79,10 @@ export class GovernanceController {
     @Param('id') id: string,
     @Body() body: { description: string },
   ): Promise<GovernanceProposal> {
-    return this.governanceService.updateProposalDescription(id, body.description);
+    return this.governanceService.updateProposalDescription(
+      id,
+      body.description,
+    );
   }
 
   @Delete('proposals/:id')
@@ -64,8 +91,13 @@ export class GovernanceController {
     @Query('guardianAddress') guardianAddress?: string,
     @Query('reason') reason?: string,
   ): Promise<GovernanceProposal> {
-    const guardian = guardianAddress || '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+    const guardian =
+      guardianAddress || '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
     const cancellationReason = reason || 'Cancelled via DELETE request';
-    return this.governanceService.cancelProposal(id, guardian, cancellationReason);
+    return this.governanceService.cancelProposal(
+      id,
+      guardian,
+      cancellationReason,
+    );
   }
 }

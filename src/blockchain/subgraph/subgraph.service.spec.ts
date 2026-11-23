@@ -24,7 +24,9 @@ describe('SubgraphService', () => {
   it('should get and set subgraph endpoint', () => {
     expect(service.getEndpoint()).toContain('subgraph');
     service.setEndpoint('https://api.thegraph.com/subgraphs/name/pharma-trace');
-    expect(service.getEndpoint()).toBe('https://api.thegraph.com/subgraphs/name/pharma-trace');
+    expect(service.getEndpoint()).toBe(
+      'https://api.thegraph.com/subgraphs/name/pharma-trace',
+    );
   });
 
   it('should execute query successfully when graph node responds 200', async () => {
@@ -114,7 +116,9 @@ describe('SubgraphService', () => {
 
   it('should fetch carrier bonds and accreditations', async () => {
     const mockBonds = [{ id: 'b1', bondAmount: '5000000000000000000' }];
-    const mockAccreditations = [{ id: 'a1', accreditationType: 'GDP_LOGISTICS' }];
+    const mockAccreditations = [
+      { id: 'a1', accreditationType: 'GDP_LOGISTICS' },
+    ];
 
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -126,7 +130,8 @@ describe('SubgraphService', () => {
       }),
     } as any);
 
-    const res = await service.getCarrierBondsAndAccreditations('0xCarrierAddress');
+    const res =
+      await service.getCarrierBondsAndAccreditations('0xCarrierAddress');
     expect(res.bonds).toEqual(mockBonds);
     expect(res.accreditations).toEqual(mockAccreditations);
   });

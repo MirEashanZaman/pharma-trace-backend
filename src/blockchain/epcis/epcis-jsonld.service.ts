@@ -2,7 +2,11 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 
 export interface EpcisJsonLdEvent {
-  type: 'ObjectEvent' | 'AggregationEvent' | 'TransactionEvent' | 'TransformationEvent';
+  type:
+    | 'ObjectEvent'
+    | 'AggregationEvent'
+    | 'TransactionEvent'
+    | 'TransformationEvent';
   eventTime: string;
   eventTimeZoneOffset: string;
   action: 'OBSERVE' | 'ADD' | 'DELETE';
@@ -46,7 +50,9 @@ export class EpcisJsonLdService {
     timestamp?: Date;
   }): EpcisJsonLdEvent {
     if (!params.gtin || params.serialNumbers.length === 0) {
-      throw new BadRequestException('GTIN and at least one serial number required');
+      throw new BadRequestException(
+        'GTIN and at least one serial number required',
+      );
     }
 
     const date = params.timestamp ?? new Date();
@@ -148,9 +154,13 @@ export class EpcisJsonLdService {
   }
 
   wrapDocument(events: EpcisJsonLdEvent[], docId?: string): EpcisDocument {
-    const id = docId ?? `urn:uuid:${createHash('sha256').update(Date.now().toString()).digest('hex').substring(0, 32)}`;
+    const id =
+      docId ??
+      `urn:uuid:${createHash('sha256').update(Date.now().toString()).digest('hex').substring(0, 32)}`;
     return {
-      '@context': ['https://ref.gs1.org/standards/epcis/2.0.0/epcis-context.jsonld'],
+      '@context': [
+        'https://ref.gs1.org/standards/epcis/2.0.0/epcis-context.jsonld',
+      ],
       id,
       type: 'EPCISDocument',
       schemaVersion: '2.0',
@@ -163,9 +173,12 @@ export class EpcisJsonLdService {
 
   canonicalizeAndHash(doc: EpcisDocument): CanonicalizedEpcisResult {
     const canonicalJson = this.deterministicStringify(doc);
-    const hash = '0x' + createHash('sha256').update(canonicalJson, 'utf8').digest('hex');
+    const hash =
+      '0x' + createHash('sha256').update(canonicalJson, 'utf8').digest('hex');
 
-    this.logger.log(`Generated canonical EPCIS 2.0 JSON-LD hash ${hash} for document ${doc.id}`);
+    this.logger.log(
+      `Generated canonical EPCIS 2.0 JSON-LD hash ${hash} for document ${doc.id}`,
+    );
 
     return {
       document: doc,
@@ -181,7 +194,11 @@ export class EpcisJsonLdService {
     }
 
     if (Array.isArray(obj)) {
-      return '[' + obj.map((item) => this.deterministicStringify(item)).join(',') + ']';
+      return (
+        '[' +
+        obj.map((item) => this.deterministicStringify(item)).join(',') +
+        ']'
+      );
     }
 
     const sortedKeys = Object.keys(obj).sort();

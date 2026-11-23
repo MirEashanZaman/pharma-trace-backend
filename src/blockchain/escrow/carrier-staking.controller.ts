@@ -83,7 +83,8 @@ export class CarrierStakingController {
   getIndemnity(@Param('manufacturerAddress') manufacturerAddress: string) {
     return {
       manufacturerAddress,
-      totalIndemnified: this.stakingService.getManufacturerIndemnity(manufacturerAddress),
+      totalIndemnified:
+        this.stakingService.getManufacturerIndemnity(manufacturerAddress),
     };
   }
 

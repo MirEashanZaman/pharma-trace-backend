@@ -8,25 +8,21 @@ import { NfcVerificationService } from './nfc/nfc-verification.service';
 import { SensorConsensusEngine } from './consensus/sensor-consensus.engine';
 
 @Module({
-    imports: [
-        DrugEventsModule,
-    ],
-    controllers: [
-        IotController,
-    ],
-    providers: [
-        IotService,
-        IotGateway,
-        HardwareOracleService,
-        NfcVerificationService,
-        SensorConsensusEngine,
-    ],
-    exports: [
-        IotGateway,
-        IotService,
-        HardwareOracleService,
-        NfcVerificationService,
-        SensorConsensusEngine,
-    ],
+  imports: [DrugEventsModule],
+  controllers: [IotController],
+  providers: [
+    IotService,
+    IotGateway,
+    HardwareOracleService,
+    NfcVerificationService,
+    SensorConsensusEngine,
+  ],
+  exports: [
+    IotGateway,
+    IotService,
+    HardwareOracleService,
+    NfcVerificationService,
+    SensorConsensusEngine,
+  ],
 })
-export class IotModule { }
+export class IotModule {}

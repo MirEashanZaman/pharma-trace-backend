@@ -14,7 +14,10 @@ import { AbstractAttestationAnchor } from '../anchors/attestation-anchor';
 
 @Injectable()
 export class RegulatoryRuleEvaluator {
-  evaluateAll(rules: IComplianceRule[], data: ComplianceData): RuleEvaluationResult[] {
+  evaluateAll(
+    rules: IComplianceRule[],
+    data: ComplianceData,
+  ): RuleEvaluationResult[] {
     return rules.map((rule) => rule.evaluate(data));
   }
 }
@@ -33,11 +36,17 @@ export class DossierCryptographicSigner {
 
 @Injectable()
 export class ComplianceAuditLogger {
-  private readonly logs: Array<{ timestamp: string; entry: string; hash: string }> = [];
+  private readonly logs: Array<{
+    timestamp: string;
+    entry: string;
+    hash: string;
+  }> = [];
 
   logAudit(entry: string): { timestamp: string; entry: string; hash: string } {
     const timestamp = new Date().toISOString();
-    const hash = createHash('sha256').update(`${timestamp}:${entry}`).digest('hex');
+    const hash = createHash('sha256')
+      .update(`${timestamp}:${entry}`)
+      .digest('hex');
     const record = { timestamp, entry, hash };
     this.logs.push(record);
     return record;
@@ -74,13 +83,19 @@ export class PharmacyDispenseNode implements ISerializedTracker {
   }
 }
 
-export class ReeferLogisticsCarrier implements IColdChainAuditor, ICollateralStakeholder {
+export class ReeferLogisticsCarrier
+  implements IColdChainAuditor, ICollateralStakeholder
+{
   constructor(
     private readonly carrierAddress: string,
     private stakedBalance: number,
   ) {}
 
-  evaluateExcursions(readings: number[], minTemp: number, maxTemp: number): boolean {
+  evaluateExcursions(
+    readings: number[],
+    minTemp: number,
+    maxTemp: number,
+  ): boolean {
     if (readings.length === 0) return false;
     return readings.every((t) => t >= minTemp && t <= maxTemp);
   }
@@ -92,11 +107,15 @@ export class ReeferLogisticsCarrier implements IColdChainAuditor, ICollateralSta
   }
 
   getStakedBalance(carrierAddress: string): number {
-    if (carrierAddress.toLowerCase() !== this.carrierAddress.toLowerCase()) return 0;
+    if (carrierAddress.toLowerCase() !== this.carrierAddress.toLowerCase())
+      return 0;
     return this.stakedBalance;
   }
 
-  isCollateralSufficient(carrierAddress: string, requiredBond: number): boolean {
+  isCollateralSufficient(
+    carrierAddress: string,
+    requiredBond: number,
+  ): boolean {
     return this.getStakedBalance(carrierAddress) >= requiredBond;
   }
 }
@@ -152,7 +171,10 @@ export class ComplianceEngine {
     };
   }
 
-  async verifyAnchoredDossier(batchNumber: string, digest: string): Promise<boolean> {
+  async verifyAnchoredDossier(
+    batchNumber: string,
+    digest: string,
+  ): Promise<boolean> {
     return this.anchor.verify(batchNumber, digest);
   }
 }

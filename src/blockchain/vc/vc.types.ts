@@ -44,7 +44,9 @@ export interface CredentialProof {
   proofValue: string;
 }
 
-export interface VerifiableCredential<T extends CredentialSubject = CredentialSubject> {
+export interface VerifiableCredential<
+  T extends CredentialSubject = CredentialSubject,
+> {
   '@context': string[];
   id: string;
   type: string[];

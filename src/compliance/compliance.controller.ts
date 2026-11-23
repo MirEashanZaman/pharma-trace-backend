@@ -45,7 +45,7 @@ export class ComplianceController {
 
   @Post('evaluate')
   evaluateCompliance(@Body() data: EvaluateComplianceDto) {
-    const results = this.ruleEvaluator.evaluateAll(this.rules, data as ComplianceData);
+    const results = this.ruleEvaluator.evaluateAll(this.rules, data);
     const passed = results.every((r) => r.passed);
     return {
       passed,
@@ -57,17 +57,17 @@ export class ComplianceController {
   }
 
   @Post('anchor')
-  async anchorCompliance(
-    @Body() body: AnchorComplianceDto,
-  ) {
+  async anchorCompliance(@Body() body: AnchorComplianceDto) {
     const secret = body.secret || 'pharmatrace-default-signing-key';
-    return this.complianceEngine.processDossier(body.data as ComplianceData, secret);
+    return this.complianceEngine.processDossier(body.data, secret);
   }
 
   @Get('rules')
   listRules(@Query('authority') authority?: string) {
     if (authority) {
-      return this.rules.filter((r) => r.authority.toUpperCase() === authority.toUpperCase());
+      return this.rules.filter(
+        (r) => r.authority.toUpperCase() === authority.toUpperCase(),
+      );
     }
     return this.rules.map((r) => ({
       ruleId: r.ruleId,
@@ -104,7 +104,10 @@ export class ComplianceController {
     @Param('batchNumber') batchNumber: string,
     @Param('digest') digest: string,
   ) {
-    const valid = await this.complianceEngine.verifyAnchoredDossier(batchNumber, digest);
+    const valid = await this.complianceEngine.verifyAnchoredDossier(
+      batchNumber,
+      digest,
+    );
     return { batchNumber, digest, valid };
   }
 

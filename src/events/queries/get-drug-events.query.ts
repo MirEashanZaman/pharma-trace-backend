@@ -1,5 +1,3 @@
 export class GetDrugEventsQuery {
-    constructor(
-        public readonly serialNumber: string,
-    ) { }
+  constructor(public readonly serialNumber: string) {}
 }

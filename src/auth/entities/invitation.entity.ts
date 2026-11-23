@@ -1,44 +1,44 @@
 import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
 } from 'typeorm';
 import { UserRole } from './user.entity';
 
 @Entity('invitations')
 export class Invitation {
-    @PrimaryGeneratedColumn()
-    id!: number;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
-    @Column({ unique: true })
-    token!: string;
+  @Column({ unique: true })
+  token!: string;
 
-    @Column()
-    organizationName!: string;
+  @Column()
+  organizationName!: string;
 
-    @Column({
-        type: 'enum',
-        enum: UserRole,
-        default: UserRole.MANUFACTURER,
-    })
-    assignedRole!: UserRole;
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.MANUFACTURER,
+  })
+  assignedRole!: UserRole;
 
-    @Column({ nullable: true })
-    recipientEmail?: string;
+  @Column({ nullable: true })
+  recipientEmail?: string;
 
-    @Column({ default: false })
-    isClaimed!: boolean;
+  @Column({ default: false })
+  isClaimed!: boolean;
 
-    @Column({ nullable: true })
-    claimedByEmail?: string;
+  @Column({ nullable: true })
+  claimedByEmail?: string;
 
-    @Column()
-    expiresAt!: Date;
+  @Column()
+  expiresAt!: Date;
 
-    @Column({ nullable: true })
-    createdById?: number;
+  @Column({ nullable: true })
+  createdById?: number;
 
-    @CreateDateColumn()
-    createdAt!: Date;
+  @CreateDateColumn()
+  createdAt!: Date;
 }

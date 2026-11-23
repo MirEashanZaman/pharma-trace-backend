@@ -8,29 +8,29 @@ import { TemperatureMonitoredStrategy } from './temperature-monitored.strategy';
 
 @Injectable()
 export class EventStrategyFactory {
-    constructor(
-        private readonly manufacturedStrategy: ManufacturedStrategy,
-        private readonly shippedStrategy: ShippedStrategy,
-        private readonly receivedStrategy: ReceivedStrategy,
-        private readonly temperatureMonitoredStrategy: TemperatureMonitoredStrategy,
-    ) { }
+  constructor(
+    private readonly manufacturedStrategy: ManufacturedStrategy,
+    private readonly shippedStrategy: ShippedStrategy,
+    private readonly receivedStrategy: ReceivedStrategy,
+    private readonly temperatureMonitoredStrategy: TemperatureMonitoredStrategy,
+  ) {}
 
-    getStrategy(eventType: string): EventStrategy | null {
-        switch (eventType) {
-            case 'MANUFACTURED':
-                return this.manufacturedStrategy;
+  getStrategy(eventType: string): EventStrategy | null {
+    switch (eventType) {
+      case 'MANUFACTURED':
+        return this.manufacturedStrategy;
 
-            case 'SHIPPED':
-                return this.shippedStrategy;
+      case 'SHIPPED':
+        return this.shippedStrategy;
 
-            case 'RECEIVED':
-                return this.receivedStrategy;
+      case 'RECEIVED':
+        return this.receivedStrategy;
 
-            case 'TEMPERATURE_MONITORED':
-                return this.temperatureMonitoredStrategy;
+      case 'TEMPERATURE_MONITORED':
+        return this.temperatureMonitoredStrategy;
 
-            default:
-                return null;
-        }
+      default:
+        return null;
     }
+  }
 }

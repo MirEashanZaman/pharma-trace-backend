@@ -11,7 +11,9 @@ export class DirectOnChainAnchor extends AbstractAttestationAnchor {
 
   async anchor(batchId: string, digest: string): Promise<AnchorReceipt> {
     const key = `${batchId}:${digest}`;
-    const txHash = '0x' + createHash('sha256').update(`direct:${key}:${Date.now()}`).digest('hex');
+    const txHash =
+      '0x' +
+      createHash('sha256').update(`direct:${key}:${Date.now()}`).digest('hex');
     const receipt: AnchorReceipt = {
       anchorId: `anchor-direct-${Date.now()}`,
       batchId,
@@ -37,8 +39,14 @@ export class MerkleBatchedAnchor extends AbstractAttestationAnchor {
 
   async anchor(batchId: string, digest: string): Promise<AnchorReceipt> {
     const syntheticProof = [
-      '0x' + createHash('sha256').update(digest + 'sibling_1').digest('hex'),
-      '0x' + createHash('sha256').update(digest + 'sibling_2').digest('hex'),
+      '0x' +
+        createHash('sha256')
+          .update(digest + 'sibling_1')
+          .digest('hex'),
+      '0x' +
+        createHash('sha256')
+          .update(digest + 'sibling_2')
+          .digest('hex'),
     ];
 
     let currentHash = digest;
@@ -51,7 +59,11 @@ export class MerkleBatchedAnchor extends AbstractAttestationAnchor {
     }
 
     const merkleRoot = currentHash;
-    const txHash = '0x' + createHash('sha256').update(`merkle:${merkleRoot}:${Date.now()}`).digest('hex');
+    const txHash =
+      '0x' +
+      createHash('sha256')
+        .update(`merkle:${merkleRoot}:${Date.now()}`)
+        .digest('hex');
 
     this.rootLedger.set(batchId, merkleRoot);
     this.proofStore.set(`${batchId}:${digest}`, syntheticProof);

@@ -1,6 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { createHash } from 'crypto';
-import { EpcisJsonLdEvent, EpcisJsonLdService, EpcisDocument } from './epcis-jsonld.service';
+import {
+  EpcisJsonLdEvent,
+  EpcisJsonLdService,
+  EpcisDocument,
+} from './epcis-jsonld.service';
 import {
   EpcisQueryParametersDto,
   EpcisQueryDocument,
@@ -10,7 +19,10 @@ import {
 @Injectable()
 export class EpcisQueryService {
   private readonly logger = new Logger(EpcisQueryService.name);
-  private readonly eventStore: Map<string, EpcisJsonLdEvent & { eventID: string }> = new Map();
+  private readonly eventStore: Map<
+    string,
+    EpcisJsonLdEvent & { eventID: string }
+  > = new Map();
 
   constructor(private readonly jsonLdService: EpcisJsonLdService) {
     this.seedBaselineEnterpriseEvents();
@@ -49,11 +61,18 @@ export class EpcisQueryService {
     this.ingestSingleEvent(shipEvent);
   }
 
-  private ingestSingleEvent(event: EpcisJsonLdEvent, customId?: string): string {
+  private ingestSingleEvent(
+    event: EpcisJsonLdEvent,
+    customId?: string,
+  ): string {
     const rawId =
       customId ||
       `urn:uuid:${createHash('sha256')
-        .update(JSON.stringify(event) + Date.now().toString() + Math.random().toString())
+        .update(
+          JSON.stringify(event) +
+            Date.now().toString() +
+            Math.random().toString(),
+        )
         .digest('hex')
         .substring(0, 32)}`;
     const eventWithId: EpcisJsonLdEvent & { eventID: string } = {
@@ -64,7 +83,9 @@ export class EpcisQueryService {
     return rawId;
   }
 
-  capture(payload: EpcisDocument | EpcisJsonLdEvent | EpcisJsonLdEvent[]): EpcisCaptureJobResult {
+  capture(
+    payload: EpcisDocument | EpcisJsonLdEvent | EpcisJsonLdEvent[],
+  ): EpcisCaptureJobResult {
     let eventsToCapture: EpcisJsonLdEvent[] = [];
 
     if (Array.isArray(payload)) {
@@ -72,7 +93,7 @@ export class EpcisQueryService {
     } else if ('epcisBody' in payload && payload.epcisBody?.eventList) {
       eventsToCapture = payload.epcisBody.eventList;
     } else if ('type' in payload && 'action' in payload) {
-      eventsToCapture = [payload as EpcisJsonLdEvent];
+      eventsToCapture = [payload];
     } else {
       throw new BadRequestException('Invalid EPCIS 2.0 capture payload');
     }
@@ -82,7 +103,9 @@ export class EpcisQueryService {
       this.ingestSingleEvent(evt);
     }
 
-    this.logger.log(`Ingested ${eventsToCapture.length} EPCIS 2.0 events via capture job ${captureId}`);
+    this.logger.log(
+      `Ingested ${eventsToCapture.length} EPCIS 2.0 events via capture job ${captureId}`,
+    );
 
     return {
       captureID: captureId,
@@ -105,7 +128,11 @@ export class EpcisQueryService {
       const step = params.EQ_bizStep.toLowerCase();
       matched = matched.filter((e) => {
         const eventStep = (e.bizStep || '').toLowerCase();
-        return eventStep === step || eventStep.endsWith(`:${step}`) || eventStep.includes(step);
+        return (
+          eventStep === step ||
+          eventStep.endsWith(`:${step}`) ||
+          eventStep.includes(step)
+        );
       });
     }
 
@@ -118,18 +145,26 @@ export class EpcisQueryService {
       const disp = params.EQ_disposition.toLowerCase();
       matched = matched.filter((e) => {
         const eventDisp = (e.disposition || '').toLowerCase();
-        return eventDisp === disp || eventDisp.endsWith(`:${disp}`) || eventDisp.includes(disp);
+        return (
+          eventDisp === disp ||
+          eventDisp.endsWith(`:${disp}`) ||
+          eventDisp.includes(disp)
+        );
       });
     }
 
     if (params.EQ_readPoint) {
       const rp = params.EQ_readPoint.toLowerCase();
-      matched = matched.filter((e) => (e.readPoint?.id || '').toLowerCase().includes(rp));
+      matched = matched.filter((e) =>
+        (e.readPoint?.id || '').toLowerCase().includes(rp),
+      );
     }
 
     if (params.EQ_bizLocation) {
       const loc = params.EQ_bizLocation.toLowerCase();
-      matched = matched.filter((e) => (e.bizLocation?.id || '').toLowerCase().includes(loc));
+      matched = matched.filter((e) =>
+        (e.bizLocation?.id || '').toLowerCase().includes(loc),
+      );
     }
 
     if (params.EQ_eventID) {
@@ -138,16 +173,24 @@ export class EpcisQueryService {
 
     if (params.MATCH_parentID) {
       const parent = params.MATCH_parentID.toLowerCase();
-      matched = matched.filter((e) => (e.parentID || '').toLowerCase().includes(parent));
+      matched = matched.filter((e) =>
+        (e.parentID || '').toLowerCase().includes(parent),
+      );
     }
 
     if (params.MATCH_epc) {
       const targetEpc = params.MATCH_epc.toLowerCase();
       matched = matched.filter((e) => {
-        if (e.epcList && e.epcList.some((epc) => epc.toLowerCase().includes(targetEpc))) {
+        if (
+          e.epcList &&
+          e.epcList.some((epc) => epc.toLowerCase().includes(targetEpc))
+        ) {
           return true;
         }
-        if (e.childEPCs && e.childEPCs.some((epc) => epc.toLowerCase().includes(targetEpc))) {
+        if (
+          e.childEPCs &&
+          e.childEPCs.some((epc) => epc.toLowerCase().includes(targetEpc))
+        ) {
           return true;
         }
         if (e.parentID && e.parentID.toLowerCase().includes(targetEpc)) {
@@ -159,12 +202,16 @@ export class EpcisQueryService {
 
     if (params.GE_eventTime) {
       const geTime = new Date(params.GE_eventTime).getTime();
-      matched = matched.filter((e) => new Date(e.eventTime).getTime() >= geTime);
+      matched = matched.filter(
+        (e) => new Date(e.eventTime).getTime() >= geTime,
+      );
     }
 
     if (params.LE_eventTime) {
       const leTime = new Date(params.LE_eventTime).getTime();
-      matched = matched.filter((e) => new Date(e.eventTime).getTime() <= leTime);
+      matched = matched.filter(
+        (e) => new Date(e.eventTime).getTime() <= leTime,
+      );
     }
 
     const direction = (params.orderDirection || 'DESC').toUpperCase();
@@ -175,12 +222,17 @@ export class EpcisQueryService {
     });
 
     const totalCount = matched.length;
-    const perPage = params.perPage ? Math.min(Math.max(1, Number(params.perPage)), 100) : 30;
+    const perPage = params.perPage
+      ? Math.min(Math.max(1, Number(params.perPage)), 100)
+      : 30;
 
     let offset = 0;
     if (params.nextPageToken) {
       try {
-        offset = parseInt(Buffer.from(params.nextPageToken, 'base64').toString('ascii'), 10);
+        offset = parseInt(
+          Buffer.from(params.nextPageToken, 'base64').toString('ascii'),
+          10,
+        );
         if (isNaN(offset)) offset = 0;
       } catch {
         offset = 0;
@@ -190,11 +242,15 @@ export class EpcisQueryService {
     const pagedEvents = matched.slice(offset, offset + perPage);
     let nextPageToken: string | undefined = undefined;
     if (offset + perPage < totalCount) {
-      nextPageToken = Buffer.from((offset + perPage).toString()).toString('base64');
+      nextPageToken = Buffer.from((offset + perPage).toString()).toString(
+        'base64',
+      );
     }
 
     const queryDocument: EpcisQueryDocument = {
-      '@context': ['https://ref.gs1.org/standards/epcis/2.0.0/epcis-context.jsonld'],
+      '@context': [
+        'https://ref.gs1.org/standards/epcis/2.0.0/epcis-context.jsonld',
+      ],
       type: 'EPCISQueryDocument',
       schemaVersion: '2.0',
       creationDate: new Date().toISOString(),
@@ -218,12 +274,17 @@ export class EpcisQueryService {
   getEventById(eventID: string): EpcisJsonLdEvent & { eventID: string } {
     const event = this.eventStore.get(eventID);
     if (!event) {
-      throw new NotFoundException(`EPCIS event not found for eventID ${eventID}`);
+      throw new NotFoundException(
+        `EPCIS event not found for eventID ${eventID}`,
+      );
     }
     return event;
   }
 
-  updateEventDisposition(eventID: string, disposition: string): EpcisJsonLdEvent & { eventID: string } {
+  updateEventDisposition(
+    eventID: string,
+    disposition: string,
+  ): EpcisJsonLdEvent & { eventID: string } {
     const event = this.getEventById(eventID);
     event.disposition = disposition;
     this.eventStore.set(eventID, event);
@@ -266,14 +327,42 @@ export class EpcisQueryService {
             parameters: [
               { name: 'EQ_bizStep', in: 'query', schema: { type: 'string' } },
               { name: 'MATCH_epc', in: 'query', schema: { type: 'string' } },
-              { name: 'GE_eventTime', in: 'query', schema: { type: 'string', format: 'date-time' } },
-              { name: 'LE_eventTime', in: 'query', schema: { type: 'string', format: 'date-time' } },
-              { name: 'EQ_action', in: 'query', schema: { type: 'string', enum: ['OBSERVE', 'ADD', 'DELETE'] } },
-              { name: 'EQ_disposition', in: 'query', schema: { type: 'string' } },
+              {
+                name: 'GE_eventTime',
+                in: 'query',
+                schema: { type: 'string', format: 'date-time' },
+              },
+              {
+                name: 'LE_eventTime',
+                in: 'query',
+                schema: { type: 'string', format: 'date-time' },
+              },
+              {
+                name: 'EQ_action',
+                in: 'query',
+                schema: { type: 'string', enum: ['OBSERVE', 'ADD', 'DELETE'] },
+              },
+              {
+                name: 'EQ_disposition',
+                in: 'query',
+                schema: { type: 'string' },
+              },
               { name: 'EQ_readPoint', in: 'query', schema: { type: 'string' } },
-              { name: 'EQ_bizLocation', in: 'query', schema: { type: 'string' } },
-              { name: 'perPage', in: 'query', schema: { type: 'integer', default: 30 } },
-              { name: 'nextPageToken', in: 'query', schema: { type: 'string' } },
+              {
+                name: 'EQ_bizLocation',
+                in: 'query',
+                schema: { type: 'string' },
+              },
+              {
+                name: 'perPage',
+                in: 'query',
+                schema: { type: 'integer', default: 30 },
+              },
+              {
+                name: 'nextPageToken',
+                in: 'query',
+                schema: { type: 'string' },
+              },
             ],
             responses: {
               '200': {

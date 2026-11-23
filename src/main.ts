@@ -76,7 +76,9 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('PharmaTrace Enterprise Attestation API')
-    .setDescription('Enterprise pharmaceutical supply chain traceability, DSCSA compliance, and cryptographic event tracking API')
+    .setDescription(
+      'Enterprise pharmaceutical supply chain traceability, DSCSA compliance, and cryptographic event tracking API',
+    )
     .setVersion('1.0.0')
     .addBearerAuth()
     .build();

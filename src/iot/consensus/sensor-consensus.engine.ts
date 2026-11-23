@@ -56,7 +56,9 @@ export class SensorConsensusEngine {
 
   calculateMedian(values: number[]): number {
     if (values.length === 0) {
-      throw new BadRequestException('Cannot calculate median of an empty set of readings');
+      throw new BadRequestException(
+        'Cannot calculate median of an empty set of readings',
+      );
     }
     const sorted = [...values].sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
@@ -93,7 +95,8 @@ export class SensorConsensusEngine {
           sensorId: reading.sensorId,
           reading: reading.temperature,
           deviation: Number(deviation.toFixed(2)),
-          reason: reading.temperature > medianTemp ? 'HIGH_OUTLIER' : 'LOW_OUTLIER',
+          reason:
+            reading.temperature > medianTemp ? 'HIGH_OUTLIER' : 'LOW_OUTLIER',
         });
       } else {
         healthyCount++;
@@ -101,7 +104,9 @@ export class SensorConsensusEngine {
     }
 
     const isCompliant = medianTemp >= minTemp && medianTemp <= maxTemp;
-    const confidenceScore = Number(((healthyCount / checkpoint.readings.length) * 100).toFixed(1));
+    const confidenceScore = Number(
+      ((healthyCount / checkpoint.readings.length) * 100).toFixed(1),
+    );
 
     if (faultySensors.length > 0) {
       this.logger.warn(
@@ -132,7 +137,9 @@ export class SensorConsensusEngine {
     outlierTolerance: number = 2.5,
   ): EscrowConsensusReport {
     if (!clusters || clusters.length === 0) {
-      throw new BadRequestException('Transit evaluation requires at least one multi-sensor checkpoint cluster');
+      throw new BadRequestException(
+        'Transit evaluation requires at least one multi-sensor checkpoint cluster',
+      );
     }
 
     const evaluations: ConsensusEvaluation[] = [];
@@ -142,7 +149,12 @@ export class SensorConsensusEngine {
     const allMedians: number[] = [];
 
     for (const cluster of clusters) {
-      const evalResult = this.evaluateCheckpoint(cluster, minTemp, maxTemp, outlierTolerance);
+      const evalResult = this.evaluateCheckpoint(
+        cluster,
+        minTemp,
+        maxTemp,
+        outlierTolerance,
+      );
       evaluations.push(evalResult);
       allMedians.push(evalResult.medianTemperature);
       totalIsolatedFaults += evalResult.faultySensors.length;

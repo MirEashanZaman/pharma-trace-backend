@@ -32,11 +32,17 @@ export class EpcisQueryController {
     res.setHeader('GS1-CBV-Version', '2.0');
     res.setHeader('GS1-CBV-Min', '2.0');
     res.setHeader('GS1-CBV-Max', '2.0');
-    res.setHeader('GS1-Extensions', '["https://pharmatrace.org/epcis/extensions/v1"]');
+    res.setHeader(
+      'GS1-Extensions',
+      '["https://pharmatrace.org/epcis/extensions/v1"]',
+    );
     res.setHeader('Content-Type', 'application/ld+json');
 
     if (result.nextPageToken) {
-      res.setHeader('Link', `</epcis/events?nextPageToken=${result.nextPageToken}>; rel="next"`);
+      res.setHeader(
+        'Link',
+        `</epcis/events?nextPageToken=${result.nextPageToken}>; rel="next"`,
+      );
     }
 
     return result.document;
@@ -100,7 +106,10 @@ export class EpcisQueryController {
   ) {
     res.setHeader('GS1-EPCIS-Version', '2.0');
     res.setHeader('GS1-CBV-Version', '2.0');
-    return this.epcisQueryService.updateEventDisposition(eventID, body.disposition);
+    return this.epcisQueryService.updateEventDisposition(
+      eventID,
+      body.disposition,
+    );
   }
 
   @Delete('events/:eventID')

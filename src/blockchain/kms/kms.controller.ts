@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { KmsSignerService } from './kms-signer.service';
 import type { KmsKeyMetadata, KmsSignatureResult } from './kms-signer.service';
 
@@ -32,7 +41,11 @@ export class KmsController {
 
   @Post('verify')
   async verifySignature(@Body() body: any): Promise<{ valid: boolean }> {
-    const valid = await this.kmsService.verifyKmsSignature(body.message, body.signature, body.keyId);
+    const valid = await this.kmsService.verifyKmsSignature(
+      body.message,
+      body.signature,
+      body.keyId,
+    );
     return { valid };
   }
 
@@ -55,7 +68,10 @@ export class KmsController {
   }
 
   @Delete('keys/:keyId')
-  deleteKey(@Param('keyId') keyId: string): { deleted: boolean; keyId: string } {
+  deleteKey(@Param('keyId') keyId: string): {
+    deleted: boolean;
+    keyId: string;
+  } {
     const deleted = this.kmsService.deregisterKey(keyId);
     return { deleted, keyId };
   }

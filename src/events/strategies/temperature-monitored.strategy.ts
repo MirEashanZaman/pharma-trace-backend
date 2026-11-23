@@ -5,9 +5,9 @@ import { EventStrategy } from './event.strategy';
 
 @Injectable()
 export class TemperatureMonitoredStrategy implements EventStrategy {
-    process(event: DrugEvent): void {
-        console.log(
-            `[STRATEGY] Temperature monitoring processed for ${event.drugSerialNumber}`,
-        );
-    }
+  process(event: DrugEvent): void {
+    console.log(
+      `[STRATEGY] Temperature monitoring processed for ${event.drugSerialNumber}`,
+    );
+  }
 }

@@ -22,15 +22,23 @@ export class NfcVerificationService {
   private readonly logger = new Logger(NfcVerificationService.name);
   private readonly tags: Map<string, NfcRegisteredTag> = new Map();
 
-  registerTag(tagUid: string, secretKeyHex: string, drugSerialNumber: string): void {
+  registerTag(
+    tagUid: string,
+    secretKeyHex: string,
+    drugSerialNumber: string,
+  ): void {
     const cleanUid = tagUid.toLowerCase().replace(/[^a-f0-9]/g, '');
     if (cleanUid.length !== 14) {
-      throw new BadRequestException('NTAG 424 DNA UID must be a 7-byte hexadecimal string (14 characters)');
+      throw new BadRequestException(
+        'NTAG 424 DNA UID must be a 7-byte hexadecimal string (14 characters)',
+      );
     }
 
     const cleanKey = secretKeyHex.replace(/[^a-f0-9]/g, '');
     if (cleanKey.length !== 32) {
-      throw new BadRequestException('Master AES-128 key must be a 16-byte hexadecimal string (32 characters)');
+      throw new BadRequestException(
+        'Master AES-128 key must be a 16-byte hexadecimal string (32 characters)',
+      );
     }
 
     const tag: NfcRegisteredTag = {
@@ -42,7 +50,9 @@ export class NfcVerificationService {
     };
 
     this.tags.set(cleanUid, tag);
-    this.logger.log(`Registered dynamic NTAG 424 DNA chip for serial ${drugSerialNumber} (UID: ${cleanUid})`);
+    this.logger.log(
+      `Registered dynamic NTAG 424 DNA chip for serial ${drugSerialNumber} (UID: ${cleanUid})`,
+    );
   }
 
   computeCmac(secretKey: Buffer, tagUid: string, tapCounter: number): string {
@@ -79,7 +89,11 @@ export class NfcVerificationService {
     };
   }
 
-  verifyScan(tagUid: string, tapCounter: number, cmacHex: string): NfcVerificationResult {
+  verifyScan(
+    tagUid: string,
+    tapCounter: number,
+    cmacHex: string,
+  ): NfcVerificationResult {
     const cleanUid = tagUid.toLowerCase().replace(/[^a-f0-9]/g, '');
     const tag = this.tags.get(cleanUid);
 

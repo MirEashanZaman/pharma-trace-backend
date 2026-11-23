@@ -1,68 +1,68 @@
 import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    UpdateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 export enum UserRole {
-    ADMIN = 'ADMIN',
-    MANUFACTURER = 'MANUFACTURER',
-    DISTRIBUTOR = 'DISTRIBUTOR',
-    PHARMACY = 'PHARMACY',
-    REGULATOR = 'REGULATOR',
-    CUSTOMER = 'CUSTOMER',
+  ADMIN = 'ADMIN',
+  MANUFACTURER = 'MANUFACTURER',
+  DISTRIBUTOR = 'DISTRIBUTOR',
+  PHARMACY = 'PHARMACY',
+  REGULATOR = 'REGULATOR',
+  CUSTOMER = 'CUSTOMER',
 }
 
 @Entity('users')
 export class User {
-    @PrimaryGeneratedColumn()
-    id!: number;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
-    @Column({ unique: true })
-    email!: string;
+  @Column({ unique: true })
+  email!: string;
 
-    @Column({ nullable: true })
-    password?: string;
+  @Column({ nullable: true })
+  password?: string;
 
-    @Column({ nullable: true })
-    fullName?: string;
+  @Column({ nullable: true })
+  fullName?: string;
 
-    @Column({
-        type: 'enum',
-        enum: UserRole,
-        default: UserRole.MANUFACTURER,
-    })
-    role!: UserRole;
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.MANUFACTURER,
+  })
+  role!: UserRole;
 
-    @Column({ nullable: true, unique: true })
-    walletAddress?: string;
+  @Column({ nullable: true, unique: true })
+  walletAddress?: string;
 
-    @Column({ nullable: true })
-    organization?: string;
+  @Column({ nullable: true })
+  organization?: string;
 
-    @Column({ nullable: true })
-    resetPasswordOtpHash?: string;
+  @Column({ nullable: true })
+  resetPasswordOtpHash?: string;
 
-    @Column({ nullable: true })
-    resetPasswordOtpExpires?: Date;
+  @Column({ nullable: true })
+  resetPasswordOtpExpires?: Date;
 
-    @Column({ default: false })
-    isDisabled!: boolean;
+  @Column({ default: false })
+  isDisabled!: boolean;
 
-    @Column({ default: 0 })
-    warningCount!: number;
+  @Column({ default: 0 })
+  warningCount!: number;
 
-    @Column({ nullable: true })
-    warningReason?: string;
+  @Column({ nullable: true })
+  warningReason?: string;
 
-    @Column({ nullable: true })
-    warningIssuedAt?: Date;
+  @Column({ nullable: true })
+  warningIssuedAt?: Date;
 
-    @CreateDateColumn()
-    createdAt!: Date;
+  @CreateDateColumn()
+  createdAt!: Date;
 
-    @UpdateDateColumn()
-    updatedAt!: Date;
+  @UpdateDateColumn()
+  updatedAt!: Date;
 }

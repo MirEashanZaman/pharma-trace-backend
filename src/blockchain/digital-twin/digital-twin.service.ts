@@ -1,4 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException, Logger, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { keccak256, toUtf8Bytes, getAddress, isAddress } from 'ethers';
 import { BlockchainService } from '../blockchain.service';
 
@@ -50,7 +56,9 @@ export class DigitalTwinService {
     }
 
     if (this.serialIndex.has(dto.serialNumber)) {
-      throw new BadRequestException(`Digital twin for serial ${dto.serialNumber} already exists`);
+      throw new BadRequestException(
+        `Digital twin for serial ${dto.serialNumber} already exists`,
+      );
     }
 
     const payload = `${dto.gtin}:${dto.batchNumber}:${dto.serialNumber}`;
@@ -72,7 +80,9 @@ export class DigitalTwinService {
         transactionHash = receipt.hash;
         this.logger.log(`Minted digital twin on-chain: ${transactionHash}`);
       } catch (err: any) {
-        this.logger.warn(`On-chain digital twin minting failed: ${err.message}`);
+        this.logger.warn(
+          `On-chain digital twin minting failed: ${err.message}`,
+        );
       }
     }
 
@@ -91,22 +101,32 @@ export class DigitalTwinService {
 
     this.registry.set(tokenId, record);
     this.serialIndex.set(dto.serialNumber, tokenId);
-    this.logger.log(`Minted digital twin ${tokenId} for serial ${dto.serialNumber}`);
+    this.logger.log(
+      `Minted digital twin ${tokenId} for serial ${dto.serialNumber}`,
+    );
     return record;
   }
 
-  async transferCustody(serialNumber: string, fromAddress: string, toAddress: string): Promise<DigitalTwinRecord> {
+  async transferCustody(
+    serialNumber: string,
+    fromAddress: string,
+    toAddress: string,
+  ): Promise<DigitalTwinRecord> {
     const record = await this.getTwinBySerial(serialNumber);
 
     if (record.status === DigitalTwinStatus.BURNED) {
-      throw new BadRequestException('Cannot transfer custody of a burned physical-digital twin');
+      throw new BadRequestException(
+        'Cannot transfer custody of a burned physical-digital twin',
+      );
     }
 
     const normalizedFrom = getAddress(fromAddress);
     const normalizedTo = getAddress(toAddress);
 
     if (record.currentHolder !== normalizedFrom) {
-      throw new BadRequestException(`Current holder ${record.currentHolder} does not match transfer sender ${normalizedFrom}`);
+      throw new BadRequestException(
+        `Current holder ${record.currentHolder} does not match transfer sender ${normalizedFrom}`,
+      );
     }
 
     record.currentHolder = normalizedTo;
@@ -115,7 +135,11 @@ export class DigitalTwinService {
     const contract = this.blockchainService?.getDigitalTwinContract();
     if (contract) {
       try {
-        const tx = await contract.transferCustody(normalizedFrom, normalizedTo, record.tokenId);
+        const tx = await contract.transferCustody(
+          normalizedFrom,
+          normalizedTo,
+          record.tokenId,
+        );
         await tx.wait();
       } catch (err: any) {
         this.logger.warn(`On-chain custody transfer failed: ${err.message}`);
@@ -126,16 +150,23 @@ export class DigitalTwinService {
     return record;
   }
 
-  async burnOnDispense(serialNumber: string, dispenserAddress: string): Promise<DigitalTwinRecord> {
+  async burnOnDispense(
+    serialNumber: string,
+    dispenserAddress: string,
+  ): Promise<DigitalTwinRecord> {
     const record = await this.getTwinBySerial(serialNumber);
 
     if (record.status === DigitalTwinStatus.BURNED) {
-      throw new BadRequestException('Anti-recirculation alert: drug unit has already been burned and consumed');
+      throw new BadRequestException(
+        'Anti-recirculation alert: drug unit has already been burned and consumed',
+      );
     }
 
     const normalizedDispenser = getAddress(dispenserAddress);
     if (record.currentHolder !== normalizedDispenser) {
-      throw new BadRequestException('Dispenser does not possess valid custody of this digital twin');
+      throw new BadRequestException(
+        'Dispenser does not possess valid custody of this digital twin',
+      );
     }
 
     record.status = DigitalTwinStatus.BURNED;
@@ -146,7 +177,10 @@ export class DigitalTwinService {
     const contract = this.blockchainService?.getDigitalTwinContract();
     if (contract) {
       try {
-        const tx = await contract.burnOnDispense(serialNumber, normalizedDispenser);
+        const tx = await contract.burnOnDispense(
+          serialNumber,
+          normalizedDispenser,
+        );
         await tx.wait();
       } catch (err: any) {
         this.logger.warn(`On-chain digital twin burn failed: ${err.message}`);
@@ -154,7 +188,9 @@ export class DigitalTwinService {
     }
 
     this.registry.set(record.tokenId, record);
-    this.logger.log(`Burned digital twin ${record.tokenId} for serial ${serialNumber} upon patient dispense`);
+    this.logger.log(
+      `Burned digital twin ${record.tokenId} for serial ${serialNumber} upon patient dispense`,
+    );
     return record;
   }
 
@@ -172,13 +208,14 @@ export class DigitalTwinService {
       try {
         const result = await contract.verifyAuthenticity(serialNumber);
         if (result.exists) {
-          const onChainStatus = [
-            DigitalTwinStatus.MINTED,
-            DigitalTwinStatus.IN_TRANSIT,
-            DigitalTwinStatus.DELIVERED,
-            DigitalTwinStatus.DISPENSED,
-            DigitalTwinStatus.BURNED,
-          ][Number(result.status)] || DigitalTwinStatus.MINTED;
+          const onChainStatus =
+            [
+              DigitalTwinStatus.MINTED,
+              DigitalTwinStatus.IN_TRANSIT,
+              DigitalTwinStatus.DELIVERED,
+              DigitalTwinStatus.DISPENSED,
+              DigitalTwinStatus.BURNED,
+            ][Number(result.status)] || DigitalTwinStatus.MINTED;
 
           return {
             exists: true,
@@ -190,7 +227,9 @@ export class DigitalTwinService {
           };
         }
       } catch (err: any) {
-        this.logger.warn(`On-chain authenticity verification failed: ${err.message}`);
+        this.logger.warn(
+          `On-chain authenticity verification failed: ${err.message}`,
+        );
       }
     }
 
@@ -222,7 +261,9 @@ export class DigitalTwinService {
   async getTwinBySerial(serialNumber: string): Promise<DigitalTwinRecord> {
     const tokenId = this.serialIndex.get(serialNumber);
     if (!tokenId || !this.registry.has(tokenId)) {
-      throw new NotFoundException(`Digital twin for serial ${serialNumber} not found`);
+      throw new NotFoundException(
+        `Digital twin for serial ${serialNumber} not found`,
+      );
     }
     return this.registry.get(tokenId)!;
   }

@@ -1,3 +1,3 @@
 export interface EventObserver {
-    update(event: any): void;
+  update(event: any): void;
 }

@@ -1,14 +1,14 @@
 import {
-    Controller,
-    Get,
-    Post,
-    Put,
-    Delete,
-    Param,
-    Query,
-    Body,
-    UseGuards,
-    BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Query,
+  Body,
+  UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 
 import { IotService } from './iot.service';
@@ -18,120 +18,130 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('iot')
 export class IotController {
-    constructor(
-        private readonly iotService: IotService,
-        private readonly hardwareOracleService: HardwareOracleService,
-        private readonly nfcVerificationService: NfcVerificationService,
-    ) { }
+  constructor(
+    private readonly iotService: IotService,
+    private readonly hardwareOracleService: HardwareOracleService,
+    private readonly nfcVerificationService: NfcVerificationService,
+  ) {}
 
-    @Get('sensor')
-    getSensorData() {
-        return this.iotService.generateSensorData();
-    }
+  @Get('sensor')
+  getSensorData() {
+    return this.iotService.generateSensorData();
+  }
 
-    @UseGuards(JwtAuthGuard)
-    @Post('drug/:serialNumber')
-    createTemperatureEvent(
-        @Param('serialNumber') serialNumber: string,
+  @UseGuards(JwtAuthGuard)
+  @Post('drug/:serialNumber')
+  createTemperatureEvent(@Param('serialNumber') serialNumber: string) {
+    return this.iotService.createTemperatureEvent(serialNumber);
+  }
+
+  @Post('sensor/:serialNumber')
+  receiveSensorData(
+    @Param('serialNumber') serialNumber: string,
+    @Body()
+    sensorData: {
+      temperature: number;
+      humidity: number;
+      location?: string;
+      latitude?: number;
+      longitude?: number;
+      timestamp?: string;
+      deviceId?: string;
+      nonce?: number;
+      signature?: string;
+    },
+  ) {
+    if (
+      sensorData.deviceId &&
+      sensorData.signature &&
+      sensorData.nonce !== undefined
     ) {
-        return this.iotService.createTemperatureEvent(serialNumber);
-    }
-
-    @Post('sensor/:serialNumber')
-    receiveSensorData(
-        @Param('serialNumber') serialNumber: string,
-        @Body() sensorData: {
-            temperature: number;
-            humidity: number;
-            location?: string;
-            latitude?: number;
-            longitude?: number;
-            timestamp?: string;
-            deviceId?: string;
-            nonce?: number;
-            signature?: string;
-        },
-    ) {
-        if (sensorData.deviceId && sensorData.signature && sensorData.nonce !== undefined) {
-            const verification = this.hardwareOracleService.verifyTelemetry({
-                deviceId: sensorData.deviceId,
-                temperature: Number(sensorData.temperature),
-                humidity: Number(sensorData.humidity),
-                latitude: sensorData.latitude,
-                longitude: sensorData.longitude,
-                timestamp: sensorData.timestamp ? new Date(sensorData.timestamp).getTime() : Date.now(),
-                nonce: sensorData.nonce,
-                signature: sensorData.signature,
-            });
-            if (!verification.isValid) {
-                throw new BadRequestException(`Hardware enclave telemetry rejected: ${verification.reason}`);
-            }
-        }
-        return this.iotService.createSensorEvent(
-            serialNumber,
-            sensorData,
+      const verification = this.hardwareOracleService.verifyTelemetry({
+        deviceId: sensorData.deviceId,
+        temperature: Number(sensorData.temperature),
+        humidity: Number(sensorData.humidity),
+        latitude: sensorData.latitude,
+        longitude: sensorData.longitude,
+        timestamp: sensorData.timestamp
+          ? new Date(sensorData.timestamp).getTime()
+          : Date.now(),
+        nonce: sensorData.nonce,
+        signature: sensorData.signature,
+      });
+      if (!verification.isValid) {
+        throw new BadRequestException(
+          `Hardware enclave telemetry rejected: ${verification.reason}`,
         );
+      }
     }
+    return this.iotService.createSensorEvent(serialNumber, sensorData);
+  }
 
-    @UseGuards(JwtAuthGuard)
-    @Post('simulate')
-    simulateTelemetry(
-        @Body()
-        data: {
-            serialNumber?: string;
-            temperature: number;
-            humidity: number;
-            location?: string;
-        },
-    ) {
-        return this.iotService.simulateTelemetry(data);
-    }
+  @UseGuards(JwtAuthGuard)
+  @Post('simulate')
+  simulateTelemetry(
+    @Body()
+    data: {
+      serialNumber?: string;
+      temperature: number;
+      humidity: number;
+      location?: string;
+    },
+  ) {
+    return this.iotService.simulateTelemetry(data);
+  }
 
-    @Post('nfc/verify')
-    verifyNfcScan(@Body() body: { tagUid: string; tapCounter: number; cmacHex: string }) {
-        const result = this.nfcVerificationService.verifyScan(body.tagUid, body.tapCounter, body.cmacHex);
-        if (!result.isValid) {
-            throw new BadRequestException(result.reason);
-        }
-        return result;
+  @Post('nfc/verify')
+  verifyNfcScan(
+    @Body() body: { tagUid: string; tapCounter: number; cmacHex: string },
+  ) {
+    const result = this.nfcVerificationService.verifyScan(
+      body.tagUid,
+      body.tapCounter,
+      body.cmacHex,
+    );
+    if (!result.isValid) {
+      throw new BadRequestException(result.reason);
     }
+    return result;
+  }
 
-    @Post('nfc/simulate-tap/:tagUid')
-    simulateNfcTap(@Param('tagUid') tagUid: string) {
-        return this.nfcVerificationService.generateSimulatedTagTap(tagUid);
-    }
+  @Post('nfc/simulate-tap/:tagUid')
+  simulateNfcTap(@Param('tagUid') tagUid: string) {
+    return this.nfcVerificationService.generateSimulatedTagTap(tagUid);
+  }
 
-    @Get('telemetry')
-    queryTelemetry(
-        @Query('serialNumber') serialNumber?: string,
-        @Query('limit') limit?: string,
-    ) {
-        return {
-            serialNumber: serialNumber || 'all',
-            limit: limit ? Number(limit) : 100,
-            queriedAt: new Date().toISOString(),
-        };
-    }
+  @Get('telemetry')
+  queryTelemetry(
+    @Query('serialNumber') serialNumber?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return {
+      serialNumber: serialNumber || 'all',
+      limit: limit ? Number(limit) : 100,
+      queriedAt: new Date().toISOString(),
+    };
+  }
 
-    @Put('nfc/tags/:tagUid')
-    updateNfcTag(
-        @Param('tagUid') tagUid: string,
-        @Body() body: { label?: string; boundSerialNumber?: string },
-    ) {
-        return {
-            tagUid,
-            updated: true,
-            configuration: body,
-            timestamp: new Date().toISOString(),
-        };
-    }
+  @Put('nfc/tags/:tagUid')
+  updateNfcTag(
+    @Param('tagUid') tagUid: string,
+    @Body() body: { label?: string; boundSerialNumber?: string },
+  ) {
+    return {
+      tagUid,
+      updated: true,
+      configuration: body,
+      timestamp: new Date().toISOString(),
+    };
+  }
 
-    @Delete('nfc/tags/:tagUid')
-    decommissionNfcTag(@Param('tagUid') tagUid: string) {
-        return {
-            tagUid,
-            decommissioned: true,
-            timestamp: new Date().toISOString(),
-        };
-    }
+  @Delete('nfc/tags/:tagUid')
+  decommissionNfcTag(@Param('tagUid') tagUid: string) {
+    return {
+      tagUid,
+      decommissioned: true,
+      timestamp: new Date().toISOString(),
+    };
+  }
 }

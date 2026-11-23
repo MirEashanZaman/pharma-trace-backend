@@ -285,7 +285,8 @@ export class SubgraphService {
             dispenser: null,
             mintedAt: '1761800000',
             burnedAt: null,
-            ipfsDossierCid: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+            ipfsDossierCid:
+              'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
             transfers: [
               {
                 id: '0x1-0',
@@ -294,7 +295,8 @@ export class SubgraphService {
                 amount: '1',
                 timestamp: '1761801000',
                 blockNumber: '100',
-                transactionHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+                transactionHash:
+                  '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
               },
             ],
           },
@@ -309,8 +311,10 @@ export class SubgraphService {
             timestamp: '1761800000',
             isRevoked: false,
             revocationReason: null,
-            metadataUri: 'ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
-            transactionHash: '0x1111111111111111111111111111111111111111111111111111111111111111',
+            metadataUri:
+              'ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+            transactionHash:
+              '0x1111111111111111111111111111111111111111111111111111111111111111',
           },
         ],
         escrowOrders: [],
@@ -333,7 +337,8 @@ export class SubgraphService {
             dispenser: null,
             mintedAt: '1761800000',
             burnedAt: null,
-            ipfsDossierCid: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+            ipfsDossierCid:
+              'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
             transfers: [],
           },
         ],
@@ -355,7 +360,8 @@ export class SubgraphService {
           createdAt: '1761800000',
           settledAt: null,
           refundReason: null,
-          transactionHash: '0x2222222222222222222222222222222222222222222222222222222222222222',
+          transactionHash:
+            '0x2222222222222222222222222222222222222222222222222222222222222222',
         },
       } as unknown as T;
     }

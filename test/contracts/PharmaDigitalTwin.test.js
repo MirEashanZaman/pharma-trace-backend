@@ -98,7 +98,7 @@ describe("PharmaDigitalTwin Contract", function () {
       const tokenId = await digitalTwin.serialToTokenId(sampleSerial);
       expect(tokenId).to.not.equal(0n);
 
-      const balance = await digitalTwin.balances(tokenId, manufacturer.address);
+      const balance = await digitalTwin.balanceOf(manufacturer.address, tokenId);
       expect(balance).to.equal(1n);
 
       const metadata = await digitalTwin.itemDetails(tokenId);
@@ -189,8 +189,8 @@ describe("PharmaDigitalTwin Contract", function () {
 
       await expect(tx).to.emit(digitalTwin, "CustodyTransferred").withArgs(tokenId, manufacturer.address, distributor.address, 1n);
 
-      expect(await digitalTwin.balances(tokenId, manufacturer.address)).to.equal(0n);
-      expect(await digitalTwin.balances(tokenId, distributor.address)).to.equal(1n);
+      expect(await digitalTwin.balanceOf(manufacturer.address, tokenId)).to.equal(0n);
+      expect(await digitalTwin.balanceOf(distributor.address, tokenId)).to.equal(1n);
 
       const metadata = await digitalTwin.itemDetails(tokenId);
       expect(metadata.currentHolder).to.equal(distributor.address);
@@ -204,7 +204,7 @@ describe("PharmaDigitalTwin Contract", function () {
         tokenId
       );
 
-      expect(await digitalTwin.balances(tokenId, distributor.address)).to.equal(1n);
+      expect(await digitalTwin.balanceOf(distributor.address, tokenId)).to.equal(1n);
     });
 
     it("should reject custody transfer by unauthorized non-holder", async function () {
@@ -255,7 +255,7 @@ describe("PharmaDigitalTwin Contract", function () {
 
       await expect(tx).to.emit(digitalTwin, "ItemBurnedOnDispense");
 
-      expect(await digitalTwin.balances(tokenId, dispenser.address)).to.equal(0n);
+      expect(await digitalTwin.balanceOf(dispenser.address, tokenId)).to.equal(0n);
 
       const metadata = await digitalTwin.itemDetails(tokenId);
       expect(metadata.status).to.equal(4n);

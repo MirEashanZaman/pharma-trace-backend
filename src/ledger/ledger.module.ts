@@ -6,17 +6,9 @@ import { LedgerService } from './ledger.service';
 import { LedgerEntryEntity } from './entities/ledger-entry.entity';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([LedgerEntryEntity]),
-    ],
-    controllers: [
-        LedgerController,
-    ],
-    providers: [
-        LedgerService,
-    ],
-    exports: [
-        LedgerService,
-    ],
+  imports: [TypeOrmModule.forFeature([LedgerEntryEntity])],
+  controllers: [LedgerController],
+  providers: [LedgerService],
+  exports: [LedgerService],
 })
-export class LedgerModule { }
+export class LedgerModule {}

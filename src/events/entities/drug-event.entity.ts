@@ -1,10 +1,10 @@
 import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    ManyToOne,
-    Index,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  Index,
 } from 'typeorm';
 
 import { Drug } from '../../drugs/entities/drug.entity';
@@ -14,27 +14,27 @@ import { EventType } from '../event-type.enum';
 @Index(['drugSerialNumber', 'createdAt'])
 @Index(['eventType'])
 export class DrugEvent {
-    @PrimaryGeneratedColumn()
-    id!: number;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
-    @Column()
-    drugSerialNumber!: string;
+  @Column()
+  drugSerialNumber!: string;
 
-    @Column({
-        type: 'enum',
-        enum: EventType,
-    })
-    eventType!: EventType;
+  @Column({
+    type: 'enum',
+    enum: EventType,
+  })
+  eventType!: EventType;
 
-    @Column({ type: 'json' })
-    eventData!: Record<string, any>;
+  @Column({ type: 'json' })
+  eventData!: Record<string, any>;
 
-    @Column({ length: 64, nullable: true })
-    eventHash!: string;
+  @Column({ length: 64, nullable: true })
+  eventHash!: string;
 
-    @CreateDateColumn()
-    createdAt!: Date;
+  @CreateDateColumn()
+  createdAt!: Date;
 
-    @ManyToOne(() => Drug, (drug) => drug.events)
-    drug!: Drug;
+  @ManyToOne(() => Drug, (drug) => drug.events)
+  drug!: Drug;
 }

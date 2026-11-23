@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { DigitalTwinService } from '../digital-twin/digital-twin.service';
 
 export interface Gs1ParsedElements {
@@ -46,14 +51,18 @@ export class DigitalLinkService {
     const match = cleanUri.match(urlPattern);
 
     if (!match) {
-      throw new BadRequestException('Invalid GS1 Digital Link syntax: must contain /01/{gtin14}/21/{serial}');
+      throw new BadRequestException(
+        'Invalid GS1 Digital Link syntax: must contain /01/{gtin14}/21/{serial}',
+      );
     }
 
     const gtin = match[1];
     const serialNumber = match[2];
 
     if (!this.validateGtinChecksum(gtin)) {
-      throw new BadRequestException(`GTIN ${gtin} failed GS1 modulo-10 checksum validation`);
+      throw new BadRequestException(
+        `GTIN ${gtin} failed GS1 modulo-10 checksum validation`,
+      );
     }
 
     let batchNumber: string | undefined;
@@ -61,7 +70,9 @@ export class DigitalLinkService {
 
     const queryStringIndex = cleanUri.indexOf('?');
     if (queryStringIndex !== -1) {
-      const queryParams = new URLSearchParams(cleanUri.substring(queryStringIndex + 1));
+      const queryParams = new URLSearchParams(
+        cleanUri.substring(queryStringIndex + 1),
+      );
       batchNumber = queryParams.get('10') || undefined;
       expirationDate = queryParams.get('17') || undefined;
     }
@@ -83,7 +94,7 @@ export class DigitalLinkService {
     let sum = 0;
     for (let i = 0; i < 13; i++) {
       const digit = parseInt(gtin.charAt(i), 10);
-      sum += (i % 2 === 0) ? digit * 3 : digit * 1;
+      sum += i % 2 === 0 ? digit * 3 : digit * 1;
     }
 
     const checkDigit = (10 - (sum % 10)) % 10;
@@ -98,7 +109,12 @@ export class DigitalLinkService {
     return digits.padStart(14, '0');
   }
 
-  buildCanonicalUri(gtin: string, serialNumber: string, batch?: string, expiry?: string): string {
+  buildCanonicalUri(
+    gtin: string,
+    serialNumber: string,
+    batch?: string,
+    expiry?: string,
+  ): string {
     const formattedGtin = this.formatGtin(gtin);
     let uri = `https://id.gs1.org/01/${formattedGtin}/21/${serialNumber}`;
     const params = new URLSearchParams();
@@ -111,11 +127,15 @@ export class DigitalLinkService {
     return uri;
   }
 
-  async resolveDigitalLink(gtin: string, serialNumber: string): Promise<Gs1LinksetResponse> {
+  async resolveDigitalLink(
+    gtin: string,
+    serialNumber: string,
+  ): Promise<Gs1LinksetResponse> {
     const formattedGtin = this.formatGtin(gtin);
     const anchor = `https://id.gs1.org/01/${formattedGtin}/21/${serialNumber}`;
 
-    const verification = await this.digitalTwinService.verifyAuthenticity(serialNumber);
+    const verification =
+      await this.digitalTwinService.verifyAuthenticity(serialNumber);
 
     const linkset: Gs1LinksetResponse = {
       anchor,
@@ -144,7 +164,8 @@ export class DigitalLinkService {
       'gs1:dvd': [
         {
           href: `https://verify.pharmatrace.io/twin/${verification.details?.tokenId || 'unregistered'}`,
-          title: 'On-Chain Digital Twin Authenticity and Anti-Recirculation Check',
+          title:
+            'On-Chain Digital Twin Authenticity and Anti-Recirculation Check',
           type: 'application/json',
         },
       ],

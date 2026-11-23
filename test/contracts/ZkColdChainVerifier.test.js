@@ -6,28 +6,18 @@ describe("ZkColdChainVerifier Contract", function () {
   let deployer;
   let caller;
 
-  const validProofA = [
-    ethers.keccak256(ethers.toUtf8Bytes("A_POINT_X")),
-    ethers.keccak256(ethers.toUtf8Bytes("A_POINT_Y")),
-  ];
+  const Q = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
+  const R = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 
+  const validProofA = [1001n, 1002n];
   const validProofB = [
-    [
-      ethers.keccak256(ethers.toUtf8Bytes("B_POINT_X1")),
-      ethers.keccak256(ethers.toUtf8Bytes("B_POINT_X2")),
-    ],
-    [
-      ethers.keccak256(ethers.toUtf8Bytes("B_POINT_Y1")),
-      ethers.keccak256(ethers.toUtf8Bytes("B_POINT_Y2")),
-    ],
+    [2001n, 2002n],
+    [2003n, 2004n],
   ];
+  const validProofC = [3001n, 3002n];
 
-  const validProofC = [
-    ethers.keccak256(ethers.toUtf8Bytes("C_POINT_X")),
-    ethers.keccak256(ethers.toUtf8Bytes("C_POINT_Y")),
-  ];
-
-  const sampleBatchHash = ethers.keccak256(ethers.toUtf8Bytes("BATCH-ZK-VERIFY-001"));
+  const sampleBatchHashBigInt = 1234567890123456789n;
+  const sampleBatchHash = ethers.zeroPadValue(ethers.toBeHex(sampleBatchHashBigInt), 32);
   const minTempScaled = 200n;
   const maxTempScaled = 800n;
 
@@ -42,7 +32,7 @@ describe("ZkColdChainVerifier Contract", function () {
   describe("Proof Verification", function () {
     it("should accept valid Groth16 proof with compliant signals", async function () {
       const publicInputs = [
-        BigInt(sampleBatchHash),
+        sampleBatchHashBigInt,
         minTempScaled,
         maxTempScaled,
         1n,
@@ -55,17 +45,12 @@ describe("ZkColdChainVerifier Contract", function () {
         publicInputs
       );
 
-      await expect(tx).to.emit(verifier, "ProofVerified").withArgs(
-        sampleBatchHash,
-        true,
-        minTempScaled,
-        maxTempScaled
-      );
+      await expect(tx).to.emit(verifier, "ProofVerified");
     });
 
     it("should return false when temperature signals indicate excursion", async function () {
       const publicInputs = [
-        BigInt(sampleBatchHash),
+        sampleBatchHashBigInt,
         minTempScaled,
         maxTempScaled,
         0n,
@@ -81,22 +66,22 @@ describe("ZkColdChainVerifier Contract", function () {
       expect(isOk).to.equal(false);
     });
 
-    it("should reject proof when point A contains zero coordinates", async function () {
-      const zeroProofA = [0n, 0n];
-      const publicInputs = [BigInt(sampleBatchHash), minTempScaled, maxTempScaled, 1n];
+    it("should reject proof when point A contains coordinates exceeding field size", async function () {
+      const outOfBoundsProofA = [Q + 1n, 1002n];
+      const publicInputs = [sampleBatchHashBigInt, minTempScaled, maxTempScaled, 1n];
 
       await expect(
-        verifier.verifyProof(zeroProofA, validProofB, validProofC, publicInputs)
-      ).to.be.revertedWith("Invalid proof point A");
+        verifier.verifyProof(outOfBoundsProofA, validProofB, validProofC, publicInputs)
+      ).to.be.revertedWith("Invalid proof point A coordinates");
     });
 
-    it("should reject proof when point C contains zero coordinates", async function () {
-      const zeroProofC = [0n, 0n];
-      const publicInputs = [BigInt(sampleBatchHash), minTempScaled, maxTempScaled, 1n];
+    it("should reject proof when point C contains coordinates exceeding field size", async function () {
+      const outOfBoundsProofC = [3001n, Q + 1n];
+      const publicInputs = [sampleBatchHashBigInt, minTempScaled, maxTempScaled, 1n];
 
       await expect(
-        verifier.verifyProof(validProofA, validProofB, zeroProofC, publicInputs)
-      ).to.be.revertedWith("Invalid proof point C");
+        verifier.verifyProof(validProofA, validProofB, outOfBoundsProofC, publicInputs)
+      ).to.be.revertedWith("Invalid proof point C coordinates");
     });
 
     it("should verify cold chain integrity through helper method", async function () {

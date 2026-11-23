@@ -13,7 +13,9 @@ export interface RevocationRecord {
 export class StatusList2021Registry {
   private readonly logger = new Logger(StatusList2021Registry.name);
   private readonly listSize: number = 100000;
-  private readonly bits: Uint8Array = new Uint8Array(Math.ceil(this.listSize / 8));
+  private readonly bits: Uint8Array = new Uint8Array(
+    Math.ceil(this.listSize / 8),
+  );
   private readonly revocationAudit: Map<number, RevocationRecord> = new Map();
   private nextAvailableIndex: number = 0;
 
@@ -33,7 +35,9 @@ export class StatusList2021Registry {
     reason: string = 'Regulatory GxP Non-Compliance Revocation',
   ): { index: number; stateHash: string; record: RevocationRecord } {
     if (index < 0 || index >= this.listSize) {
-      throw new BadRequestException(`Status list index ${index} out of bounds [0, ${this.listSize - 1}]`);
+      throw new BadRequestException(
+        `Status list index ${index} out of bounds [0, ${this.listSize - 1}]`,
+      );
     }
 
     const byteIndex = Math.floor(index / 8);
@@ -50,7 +54,9 @@ export class StatusList2021Registry {
     this.revocationAudit.set(index, record);
 
     const stateHash = this.computeStateHash();
-    this.logger.warn(`Revoked credential ${credentialId} at status list index ${index}. State root: ${stateHash}`);
+    this.logger.warn(
+      `Revoked credential ${credentialId} at status list index ${index}. State root: ${stateHash}`,
+    );
 
     return {
       index,
@@ -59,7 +65,10 @@ export class StatusList2021Registry {
     };
   }
 
-  unrevoke(index: number, authorizedBy: string): { index: number; stateHash: string } {
+  unrevoke(
+    index: number,
+    authorizedBy: string,
+  ): { index: number; stateHash: string } {
     if (index < 0 || index >= this.listSize) {
       throw new BadRequestException(`Status list index ${index} out of bounds`);
     }
@@ -70,7 +79,9 @@ export class StatusList2021Registry {
     this.revocationAudit.delete(index);
 
     const stateHash = this.computeStateHash();
-    this.logger.log(`Reinstated credential at status list index ${index} by ${authorizedBy}. State root: ${stateHash}`);
+    this.logger.log(
+      `Reinstated credential at status list index ${index} by ${authorizedBy}. State root: ${stateHash}`,
+    );
 
     return { index, stateHash };
   }
@@ -93,7 +104,11 @@ export class StatusList2021Registry {
   }
 
   exportStatusListCredential(issuerDid: string): any {
-    const encodedList = Buffer.from(this.bits.buffer, this.bits.byteOffset, this.bits.byteLength).toString('base64');
+    const encodedList = Buffer.from(
+      this.bits.buffer,
+      this.bits.byteOffset,
+      this.bits.byteLength,
+    ).toString('base64');
 
     return {
       '@context': [

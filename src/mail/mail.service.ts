@@ -3,33 +3,33 @@ import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
-    private readonly logger = new Logger(MailService.name);
-    private transporter: nodemailer.Transporter | null = null;
+  private readonly logger = new Logger(MailService.name);
+  private transporter: nodemailer.Transporter | null = null;
 
-    constructor() {
-        this.initializeTransporter();
+  constructor() {
+    this.initializeTransporter();
+  }
+
+  private initializeTransporter() {
+    const host = process.env.SMTP_HOST;
+    const port = parseInt(process.env.SMTP_PORT || '587', 10);
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+
+    if (host && user && pass) {
+      this.transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+      });
     }
+  }
 
-    private initializeTransporter() {
-        const host = process.env.SMTP_HOST;
-        const port = parseInt(process.env.SMTP_PORT || '587', 10);
-        const user = process.env.SMTP_USER;
-        const pass = process.env.SMTP_PASS;
-
-        if (host && user && pass) {
-            this.transporter = nodemailer.createTransport({
-                host,
-                port,
-                secure: port === 465,
-                auth: { user, pass },
-            });
-        }
-    }
-
-    async sendPasswordResetOtp(to: string, otp: string): Promise<boolean> {
-        const from = process.env.MAIL_FROM || 'no-reply@pharmatrace.io';
-        const subject = 'PharmaTrace-ES: Password Reset Verification Code';
-        const html = `
+  async sendPasswordResetOtp(to: string, otp: string): Promise<boolean> {
+    const from = process.env.MAIL_FROM || 'no-reply@pharmatrace.io';
+    const subject = 'PharmaTrace-ES: Password Reset Verification Code';
+    const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -60,25 +60,24 @@ export class MailService {
 </html>
         `;
 
-        this.logger.log(`Password reset OTP for ${to}: [${otp}]`);
+    this.logger.log(`Password reset OTP for ${to}: [${otp}]`);
 
-        if (this.transporter) {
-            try {
-                await this.transporter.sendMail({
-                    from,
-                    to,
-                    subject,
-                    html,
-                    text: `PharmaTrace-ES Password Reset OTP: ${otp}. Valid for 10 minutes.`,
-                });
-                return true;
-            } catch (err: any) {
-                this.logger.error(`Failed to send email to ${to}: ${err.message}`);
-                return false;
-            }
-        }
-
+    if (this.transporter) {
+      try {
+        await this.transporter.sendMail({
+          from,
+          to,
+          subject,
+          html,
+          text: `PharmaTrace-ES Password Reset OTP: ${otp}. Valid for 10 minutes.`,
+        });
         return true;
+      } catch (err: any) {
+        this.logger.error(`Failed to send email to ${to}: ${err.message}`);
+        return false;
+      }
     }
-}
 
+    return true;
+  }
+}

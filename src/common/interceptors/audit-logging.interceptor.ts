@@ -34,7 +34,8 @@ export interface AuditChainIntegrityResult {
   headHash: string;
 }
 
-const GENESIS_AUDIT_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
+const GENESIS_AUDIT_HASH =
+  '0000000000000000000000000000000000000000000000000000000000000000';
 
 @Injectable()
 export class AuditLoggingInterceptor implements NestInterceptor {
@@ -42,13 +43,21 @@ export class AuditLoggingInterceptor implements NestInterceptor {
   private static readonly records: AuditRecord[] = [];
   private static lastHash: string = GENESIS_AUDIT_HASH;
 
-  static getAuditRecords(limit = 100, role?: string, method?: string): AuditRecord[] {
+  static getAuditRecords(
+    limit = 100,
+    role?: string,
+    method?: string,
+  ): AuditRecord[] {
     let list = [...AuditLoggingInterceptor.records];
     if (role) {
-      list = list.filter((r) => r.callerRole.toLowerCase() === role.toLowerCase());
+      list = list.filter(
+        (r) => r.callerRole.toLowerCase() === role.toLowerCase(),
+      );
     }
     if (method) {
-      list = list.filter((r) => r.method.toUpperCase() === method.toUpperCase());
+      list = list.filter(
+        (r) => r.method.toUpperCase() === method.toUpperCase(),
+      );
     }
     return list.slice(-limit).reverse();
   }
@@ -81,7 +90,9 @@ export class AuditLoggingInterceptor implements NestInterceptor {
 
       const suffix = rec.status === 'ERROR' ? ':ERR' : '';
       const calculated = createHash('sha256')
-        .update(`${rec.previousHash}:${rec.timestamp}:${rec.method}:${rec.endpoint}:${rec.statusCode}:${rec.callerId}${suffix}`)
+        .update(
+          `${rec.previousHash}:${rec.timestamp}:${rec.method}:${rec.endpoint}:${rec.statusCode}:${rec.callerId}${suffix}`,
+        )
         .digest('hex');
 
       if (calculated !== rec.hash) {
@@ -119,7 +130,9 @@ export class AuditLoggingInterceptor implements NestInterceptor {
     const startTime = Date.now();
     const { method, originalUrl, ip } = req;
     const user = (req as any).user;
-    const callerId = String(user?.userId ?? user?.id ?? user?.email ?? 'anonymous');
+    const callerId = String(
+      user?.userId ?? user?.id ?? user?.email ?? 'anonymous',
+    );
     const callerRole = String(user?.role ?? 'UNAUTHENTICATED');
 
     return next.handle().pipe(
@@ -131,7 +144,9 @@ export class AuditLoggingInterceptor implements NestInterceptor {
           const timestamp = new Date().toISOString();
           const prev = AuditLoggingInterceptor.lastHash;
           const hash = createHash('sha256')
-            .update(`${prev}:${timestamp}:${method}:${originalUrl}:${statusCode}:${callerId}`)
+            .update(
+              `${prev}:${timestamp}:${method}:${originalUrl}:${statusCode}:${callerId}`,
+            )
             .digest('hex');
           AuditLoggingInterceptor.lastHash = hash;
 
@@ -156,7 +171,7 @@ export class AuditLoggingInterceptor implements NestInterceptor {
           }
 
           this.logger.log(
-            `[AUDIT] ${method} ${originalUrl} ${statusCode} +${duration}ms [Caller: ${callerId} | Role: ${callerRole}] [IP: ${ip}]`
+            `[AUDIT] ${method} ${originalUrl} ${statusCode} +${duration}ms [Caller: ${callerId} | Role: ${callerRole}] [IP: ${ip}]`,
           );
         },
         error: (err) => {
@@ -165,7 +180,9 @@ export class AuditLoggingInterceptor implements NestInterceptor {
           const timestamp = new Date().toISOString();
           const prev = AuditLoggingInterceptor.lastHash;
           const hash = createHash('sha256')
-            .update(`${prev}:${timestamp}:${method}:${originalUrl}:${statusCode}:${callerId}:ERR`)
+            .update(
+              `${prev}:${timestamp}:${method}:${originalUrl}:${statusCode}:${callerId}:ERR`,
+            )
             .digest('hex');
           AuditLoggingInterceptor.lastHash = hash;
 
@@ -191,7 +208,7 @@ export class AuditLoggingInterceptor implements NestInterceptor {
           }
 
           this.logger.warn(
-            `[AUDIT_ERROR] ${method} ${originalUrl} ${statusCode} +${duration}ms [Caller: ${callerId} | Role: ${callerRole}] [IP: ${ip}] - ${err?.message}`
+            `[AUDIT_ERROR] ${method} ${originalUrl} ${statusCode} +${duration}ms [Caller: ${callerId} | Role: ${callerRole}] [IP: ${ip}] - ${err?.message}`,
           );
         },
       }),

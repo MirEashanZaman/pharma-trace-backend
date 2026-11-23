@@ -1,5 +1,18 @@
-import { Injectable, BadRequestException, NotFoundException, Logger, Optional } from '@nestjs/common';
-import { keccak256, toUtf8Bytes, getAddress, isAddress, parseEther, AbiCoder } from 'ethers';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+  Optional,
+} from '@nestjs/common';
+import {
+  keccak256,
+  toUtf8Bytes,
+  getAddress,
+  isAddress,
+  parseEther,
+  AbiCoder,
+} from 'ethers';
 import {
   SensorConsensusEngine,
   CheckpointCluster,
@@ -49,11 +62,15 @@ export class PharmaEscrowService {
 
   async createEscrowOrder(dto: CreateEscrowDto): Promise<EscrowRecord> {
     if (!isAddress(dto.buyer) || !isAddress(dto.seller)) {
-      throw new BadRequestException('Buyer and seller must be valid Ethereum addresses');
+      throw new BadRequestException(
+        'Buyer and seller must be valid Ethereum addresses',
+      );
     }
 
     if (dto.amountEth <= 0) {
-      throw new BadRequestException('Escrow settlement amount must be greater than zero');
+      throw new BadRequestException(
+        'Escrow settlement amount must be greater than zero',
+      );
     }
 
     const payload = `${dto.buyer}:${dto.seller}:${dto.drugSerialNumber}:${Date.now()}`;
@@ -92,7 +109,9 @@ export class PharmaEscrowService {
     };
 
     this.escrows.set(orderId, record);
-    this.logger.log(`Created commercial delivery escrow order ${orderId} for serial ${dto.drugSerialNumber} (${dto.amountEth} ETH)`);
+    this.logger.log(
+      `Created commercial delivery escrow order ${orderId} for serial ${dto.drugSerialNumber} (${dto.amountEth} ETH)`,
+    );
     return record;
   }
 
@@ -102,11 +121,18 @@ export class PharmaEscrowService {
     coldChainReadings: number[],
     minTemp: number = 2.0,
     maxTemp: number = 8.0,
-  ): Promise<{ success: boolean; released: boolean; reason?: string; order: EscrowRecord }> {
+  ): Promise<{
+    success: boolean;
+    released: boolean;
+    reason?: string;
+    order: EscrowRecord;
+  }> {
     const order = await this.getEscrow(orderId);
 
     if (order.status !== EscrowState.FUNDED) {
-      throw new BadRequestException(`Escrow ${orderId} is already in ${order.status} state`);
+      throw new BadRequestException(
+        `Escrow ${orderId} is already in ${order.status} state`,
+      );
     }
 
     if (!custodyAccepted) {
@@ -120,7 +146,9 @@ export class PharmaEscrowService {
 
     const isTemperatureCompliant =
       coldChainReadings.length > 0 &&
-      coldChainReadings.every((reading) => reading >= minTemp && reading <= maxTemp);
+      coldChainReadings.every(
+        (reading) => reading >= minTemp && reading <= maxTemp,
+      );
 
     if (!isTemperatureCompliant) {
       order.status = EscrowState.DISPUTED;
@@ -138,16 +166,24 @@ export class PharmaEscrowService {
     const contract = this.blockchainService?.getEscrowContract();
     if (contract) {
       try {
-        const tx = await contract.recordComplianceAndHandshake(orderId, true, true);
+        const tx = await contract.recordComplianceAndHandshake(
+          orderId,
+          true,
+          true,
+        );
         const receipt = await tx.wait();
         settlementTxHash = receipt.hash;
-        this.logger.log(`On-chain escrow settlement executed: ${settlementTxHash}`);
+        this.logger.log(
+          `On-chain escrow settlement executed: ${settlementTxHash}`,
+        );
       } catch (err: any) {
         this.logger.warn(`On-chain escrow settlement failed: ${err.message}`);
       }
     }
     if (!settlementTxHash) {
-      settlementTxHash = keccak256(toUtf8Bytes(`SETTLE:${orderId}:${Date.now()}`));
+      settlementTxHash = keccak256(
+        toUtf8Bytes(`SETTLE:${orderId}:${Date.now()}`),
+      );
     }
 
     order.coldChainCompliant = true;
@@ -156,7 +192,9 @@ export class PharmaEscrowService {
     order.settlementTxHash = settlementTxHash;
 
     this.escrows.set(orderId, order);
-    this.logger.log(`Escrow ${orderId} released to seller ${order.seller} (${order.amountEth} ETH)`);
+    this.logger.log(
+      `Escrow ${orderId} released to seller ${order.seller} (${order.amountEth} ETH)`,
+    );
 
     return {
       success: true,
@@ -182,7 +220,9 @@ export class PharmaEscrowService {
     const order = await this.getEscrow(orderId);
 
     if (order.status !== EscrowState.FUNDED) {
-      throw new BadRequestException(`Escrow ${orderId} is already in ${order.status} state`);
+      throw new BadRequestException(
+        `Escrow ${orderId} is already in ${order.status} state`,
+      );
     }
 
     const report = this.consensusEngine.evaluateTransitSeries(
@@ -220,16 +260,26 @@ export class PharmaEscrowService {
     const consensusContract = this.blockchainService?.getEscrowContract();
     if (consensusContract) {
       try {
-        const tx = await consensusContract.recordComplianceAndHandshake(orderId, true, true);
+        const tx = await consensusContract.recordComplianceAndHandshake(
+          orderId,
+          true,
+          true,
+        );
         const receipt = await tx.wait();
         settlementTxHash = receipt.hash;
-        this.logger.log(`On-chain consensus settlement executed: ${settlementTxHash}`);
+        this.logger.log(
+          `On-chain consensus settlement executed: ${settlementTxHash}`,
+        );
       } catch (err: any) {
-        this.logger.warn(`On-chain consensus settlement failed: ${err.message}`);
+        this.logger.warn(
+          `On-chain consensus settlement failed: ${err.message}`,
+        );
       }
     }
     if (!settlementTxHash) {
-      settlementTxHash = keccak256(toUtf8Bytes(`SETTLE_CONSENSUS:${orderId}:${Date.now()}`));
+      settlementTxHash = keccak256(
+        toUtf8Bytes(`SETTLE_CONSENSUS:${orderId}:${Date.now()}`),
+      );
     }
 
     order.coldChainCompliant = true;
@@ -250,11 +300,16 @@ export class PharmaEscrowService {
     };
   }
 
-  async triggerBreachRefund(orderId: string, reason: string): Promise<EscrowRecord> {
+  async triggerBreachRefund(
+    orderId: string,
+    reason: string,
+  ): Promise<EscrowRecord> {
     const order = await this.getEscrow(orderId);
 
     if (order.status === EscrowState.RELEASED) {
-      throw new BadRequestException('Cannot refund an escrow order that has already been released');
+      throw new BadRequestException(
+        'Cannot refund an escrow order that has already been released',
+      );
     }
 
     const contract = this.blockchainService?.getEscrowContract();
@@ -271,7 +326,9 @@ export class PharmaEscrowService {
     order.status = EscrowState.REFUNDED;
     order.refundReason = reason;
     this.escrows.set(orderId, order);
-    this.logger.log(`Escrow ${orderId} refunded to buyer ${order.buyer}. Reason: ${reason}`);
+    this.logger.log(
+      `Escrow ${orderId} refunded to buyer ${order.buyer}. Reason: ${reason}`,
+    );
     return order;
   }
 
@@ -283,7 +340,12 @@ export class PharmaEscrowService {
     return record;
   }
 
-  async checkAutomationUpkeep(): Promise<{ upkeepNeeded: boolean; orderId?: string; actionType?: number; reason?: string }> {
+  async checkAutomationUpkeep(): Promise<{
+    upkeepNeeded: boolean;
+    orderId?: string;
+    actionType?: number;
+    reason?: string;
+  }> {
     const nowSec = Math.floor(Date.now() / 1000);
     for (const [orderId, order] of this.escrows.entries()) {
       if (order.status === EscrowState.FUNDED) {
@@ -308,7 +370,10 @@ export class PharmaEscrowService {
     return { upkeepNeeded: false };
   }
 
-  async performAutomationUpkeep(orderId: string, actionType: number): Promise<EscrowRecord> {
+  async performAutomationUpkeep(
+    orderId: string,
+    actionType: number,
+  ): Promise<EscrowRecord> {
     const order = await this.getEscrow(orderId);
     if (order.status !== EscrowState.FUNDED) {
       throw new BadRequestException(`Order ${orderId} is not in funded status`);
@@ -317,8 +382,14 @@ export class PharmaEscrowService {
     const contract = this.blockchainService?.getEscrowContract();
     if (contract) {
       try {
-        const orderBytes32 = orderId.startsWith('0x') && orderId.length === 66 ? orderId : keccak256(toUtf8Bytes(orderId));
-        const performData = AbiCoder.defaultAbiCoder().encode(['bytes32', 'uint8'], [orderBytes32, actionType]);
+        const orderBytes32 =
+          orderId.startsWith('0x') && orderId.length === 66
+            ? orderId
+            : keccak256(toUtf8Bytes(orderId));
+        const performData = AbiCoder.defaultAbiCoder().encode(
+          ['bytes32', 'uint8'],
+          [orderBytes32, actionType],
+        );
         const tx = await contract.performUpkeep(performData);
         const receipt = await tx.wait();
         order.settlementTxHash = receipt.hash;
@@ -330,32 +401,49 @@ export class PharmaEscrowService {
 
     if (actionType === 1) {
       if (!order.coldChainCompliant || !order.custodyAccepted) {
-        throw new BadRequestException('Compliance conditions not met for automated release');
+        throw new BadRequestException(
+          'Compliance conditions not met for automated release',
+        );
       }
       order.status = EscrowState.RELEASED;
       if (!order.settlementTxHash) {
-        order.settlementTxHash = keccak256(toUtf8Bytes(`KEEPER_SETTLE:${orderId}:${Date.now()}`));
+        order.settlementTxHash = keccak256(
+          toUtf8Bytes(`KEEPER_SETTLE:${orderId}:${Date.now()}`),
+        );
       }
       this.escrows.set(orderId, order);
-      this.logger.log(`Chainlink Automation Keeper performed release for escrow ${orderId}`);
+      this.logger.log(
+        `Chainlink Automation Keeper performed release for escrow ${orderId}`,
+      );
       return order;
     }
 
     if (actionType === 2) {
       order.status = EscrowState.REFUNDED;
-      order.refundReason = 'Chainlink Automation Keeper: Delivery SLA timeout refund';
+      order.refundReason =
+        'Chainlink Automation Keeper: Delivery SLA timeout refund';
       if (!order.settlementTxHash) {
-        order.settlementTxHash = keccak256(toUtf8Bytes(`KEEPER_REFUND:${orderId}:${Date.now()}`));
+        order.settlementTxHash = keccak256(
+          toUtf8Bytes(`KEEPER_REFUND:${orderId}:${Date.now()}`),
+        );
       }
       this.escrows.set(orderId, order);
-      this.logger.log(`Chainlink Automation Keeper performed timeout refund for escrow ${orderId}`);
+      this.logger.log(
+        `Chainlink Automation Keeper performed timeout refund for escrow ${orderId}`,
+      );
       return order;
     }
 
-    throw new BadRequestException(`Unsupported upkeep action type: ${actionType}`);
+    throw new BadRequestException(
+      `Unsupported upkeep action type: ${actionType}`,
+    );
   }
 
-  async pollAndExecuteUpkeep(): Promise<{ executed: boolean; orderId?: string; actionType?: number }> {
+  async pollAndExecuteUpkeep(): Promise<{
+    executed: boolean;
+    orderId?: string;
+    actionType?: number;
+  }> {
     const check = await this.checkAutomationUpkeep();
     if (check.upkeepNeeded && check.orderId && check.actionType) {
       await this.performAutomationUpkeep(check.orderId, check.actionType);
@@ -368,4 +456,3 @@ export class PharmaEscrowService {
     return { executed: false };
   }
 }
-

@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import {
   SigningKey,
   Wallet,
@@ -24,7 +29,8 @@ import { DidResolverService } from '../did/did-resolver.service';
 @Injectable()
 export class VerifiableCredentialService {
   private readonly logger = new Logger(VerifiableCredentialService.name);
-  private readonly credentialStore: Map<string, VerifiableCredential> = new Map();
+  private readonly credentialStore: Map<string, VerifiableCredential> =
+    new Map();
 
   constructor(
     private readonly statusListRegistry: StatusList2021Registry,
@@ -55,15 +61,23 @@ export class VerifiableCredentialService {
     return keccak256(toUtf8Bytes(canonicalJson));
   }
 
-  private getIssuerAddress(issuerWalletOrKey: Wallet | SigningKey | any): string {
+  private getIssuerAddress(
+    issuerWalletOrKey: Wallet | SigningKey | any,
+  ): string {
     if (issuerWalletOrKey && typeof issuerWalletOrKey.address === 'string') {
       return issuerWalletOrKey.address;
     }
     return computeAddress((issuerWalletOrKey as SigningKey).publicKey);
   }
 
-  private async signDigest(issuerWalletOrKey: Wallet | SigningKey | any, digest: string): Promise<string> {
-    if (issuerWalletOrKey && typeof issuerWalletOrKey.signMessage === 'function') {
+  private async signDigest(
+    issuerWalletOrKey: Wallet | SigningKey | any,
+    digest: string,
+  ): Promise<string> {
+    if (
+      issuerWalletOrKey &&
+      typeof issuerWalletOrKey.signMessage === 'function'
+    ) {
       return await issuerWalletOrKey.signMessage(digest);
     }
     const messageHash = hashMessage(digest);
@@ -94,7 +108,10 @@ export class VerifiableCredentialService {
       coldChainSpecs: subject.coldChainSpecs,
     };
 
-    const unsignedVc: Omit<VerifiableCredential<BatchReleaseSubject>, 'proof'> = {
+    const unsignedVc: Omit<
+      VerifiableCredential<BatchReleaseSubject>,
+      'proof'
+    > = {
       '@context': [
         'https://www.w3.org/2018/credentials/v1',
         'https://pharmatrace.org/credentials/v1',
@@ -133,7 +150,9 @@ export class VerifiableCredentialService {
     };
 
     this.credentialStore.set(credentialId, vc);
-    this.logger.log(`Issued W3C BatchReleaseCredential ${credentialId} for serial ${subject.drugSerialNumber} by ${issuerDid}`);
+    this.logger.log(
+      `Issued W3C BatchReleaseCredential ${credentialId} for serial ${subject.drugSerialNumber} by ${issuerDid}`,
+    );
 
     return vc;
   }
@@ -158,7 +177,10 @@ export class VerifiableCredentialService {
       jurisdiction: subject.jurisdiction,
     };
 
-    const unsignedVc: Omit<VerifiableCredential<CarrierAccreditationSubject>, 'proof'> = {
+    const unsignedVc: Omit<
+      VerifiableCredential<CarrierAccreditationSubject>,
+      'proof'
+    > = {
       '@context': [
         'https://www.w3.org/2018/credentials/v1',
         'https://pharmatrace.org/credentials/v1',
@@ -197,24 +219,38 @@ export class VerifiableCredentialService {
     };
 
     this.credentialStore.set(credentialId, vc);
-    this.logger.log(`Issued W3C CarrierAccreditationCredential ${credentialId} for carrier ${subject.carrierName}`);
+    this.logger.log(
+      `Issued W3C CarrierAccreditationCredential ${credentialId} for carrier ${subject.carrierName}`,
+    );
 
     return vc;
   }
 
-  async verifyCredential(vc: VerifiableCredential): Promise<{ isValid: boolean; reason?: string }> {
+  async verifyCredential(
+    vc: VerifiableCredential,
+  ): Promise<{ isValid: boolean; reason?: string }> {
     if (!vc.proof || !vc.proof.proofValue) {
-      return { isValid: false, reason: 'Missing cryptographic proof in credential' };
+      return {
+        isValid: false,
+        reason: 'Missing cryptographic proof in credential',
+      };
     }
 
-    if (vc.expirationDate && new Date(vc.expirationDate).getTime() < Date.now()) {
+    if (
+      vc.expirationDate &&
+      new Date(vc.expirationDate).getTime() < Date.now()
+    ) {
       return { isValid: false, reason: 'Verifiable credential has expired' };
     }
 
     if (vc.credentialStatus) {
-      const isRevoked = this.statusListRegistry.isRevoked(vc.credentialStatus.statusListIndex);
+      const isRevoked = this.statusListRegistry.isRevoked(
+        vc.credentialStatus.statusListIndex,
+      );
       if (isRevoked) {
-        const audit = this.statusListRegistry.getRevocationRecord(vc.credentialStatus.statusListIndex);
+        const audit = this.statusListRegistry.getRevocationRecord(
+          vc.credentialStatus.statusListIndex,
+        );
         return {
           isValid: false,
           reason: `Credential is revoked on StatusList2021 registry. Reason: ${audit?.reason || 'Non-compliance'}`,
@@ -236,7 +272,10 @@ export class VerifiableCredentialService {
         };
       }
     } catch (e: any) {
-      return { isValid: false, reason: `Cryptographic signature recovery failure: ${e.message}` };
+      return {
+        isValid: false,
+        reason: `Cryptographic signature recovery failure: ${e.message}`,
+      };
     }
 
     return { isValid: true };
@@ -248,7 +287,12 @@ export class VerifiableCredentialService {
     revokedBy: string,
     reason?: string,
   ): { success: boolean; stateHash: string } {
-    const result = this.statusListRegistry.revoke(statusListIndex, credentialId, revokedBy, reason);
+    const result = this.statusListRegistry.revoke(
+      statusListIndex,
+      credentialId,
+      revokedBy,
+      reason,
+    );
     return {
       success: true,
       stateHash: result.stateHash,
@@ -302,11 +346,15 @@ export class VerifiableCredentialService {
     const claims: Record<string, any> = {};
 
     if (!vp.proof || vp.proof.challenge !== expectedChallenge) {
-      reasons.push('Presentation challenge does not match expected anti-replay challenge nonce');
+      reasons.push(
+        'Presentation challenge does not match expected anti-replay challenge nonce',
+      );
     }
 
     if (vp.proof && vp.proof.domain !== expectedDomain) {
-      reasons.push('Presentation domain does not match expected verification domain');
+      reasons.push(
+        'Presentation domain does not match expected verification domain',
+      );
     }
 
     const canonical = this.canonicalizeForSigning(vp);
@@ -316,18 +364,26 @@ export class VerifiableCredentialService {
     try {
       const recoveredHolder = verifyMessage(digest, vp.proof.proofValue);
       const expectedHolderAddress = vp.holder.replace('did:ethr:', '');
-      if (recoveredHolder.toLowerCase() !== expectedHolderAddress.toLowerCase()) {
-        reasons.push(`Holder presentation signature mismatch: recovered ${recoveredHolder}`);
+      if (
+        recoveredHolder.toLowerCase() !== expectedHolderAddress.toLowerCase()
+      ) {
+        reasons.push(
+          `Holder presentation signature mismatch: recovered ${recoveredHolder}`,
+        );
       }
     } catch (e: any) {
-      reasons.push(`Failed to verify holder presentation signature: ${e.message}`);
+      reasons.push(
+        `Failed to verify holder presentation signature: ${e.message}`,
+      );
     }
 
     let verifiedCount = 0;
     for (const vc of vp.verifiableCredential) {
       const vcCheck = await this.verifyCredential(vc);
       if (!vcCheck.isValid) {
-        reasons.push(`Embedded credential ${vc.id} failed verification: ${vcCheck.reason}`);
+        reasons.push(
+          `Embedded credential ${vc.id} failed verification: ${vcCheck.reason}`,
+        );
       } else {
         verifiedCount++;
         Object.assign(claims, vc.credentialSubject);
@@ -339,7 +395,9 @@ export class VerifiableCredentialService {
         vc.type.includes(descriptor.schema),
       );
       if (!matchingVc) {
-        reasons.push(`Presentation missing mandatory credential matching schema ${descriptor.schema}`);
+        reasons.push(
+          `Presentation missing mandatory credential matching schema ${descriptor.schema}`,
+        );
       }
     }
 
@@ -362,7 +420,8 @@ export class VerifiableCredentialService {
   ): Promise<{ authorized: boolean; qpName: string; batchNumber: string }> {
     const definition: PresentationDefinition = {
       id: 'custody-handover-gmp-gate',
-      purpose: 'Enforce valid Qualified Person GMP batch release credential before physical custody transition',
+      purpose:
+        'Enforce valid Qualified Person GMP batch release credential before physical custody transition',
       input_descriptors: [
         {
           id: 'batch-release-descriptor',
@@ -372,7 +431,11 @@ export class VerifiableCredentialService {
       ],
     };
 
-    const pexResult = await this.verifyPresentationExchange(vp, definition, challenge);
+    const pexResult = await this.verifyPresentationExchange(
+      vp,
+      definition,
+      challenge,
+    );
     if (!pexResult.isValid) {
       throw new BadRequestException(
         `Custody handover blocked by W3C Presentation Exchange: ${pexResult.reasons?.join('; ')}`,
@@ -390,7 +453,9 @@ export class VerifiableCredentialService {
       vc.type.includes('PharmaceuticalBatchReleaseCredential'),
     );
     if (!batchVc) {
-      throw new BadRequestException('Presentation does not contain PharmaceuticalBatchReleaseCredential');
+      throw new BadRequestException(
+        'Presentation does not contain PharmaceuticalBatchReleaseCredential',
+      );
     }
 
     const subject = batchVc.credentialSubject as BatchReleaseSubject;
@@ -401,7 +466,9 @@ export class VerifiableCredentialService {
     }
 
     if (!subject.gmpCertified) {
-      throw new BadRequestException('Batch release credential indicates non-compliant GMP status');
+      throw new BadRequestException(
+        'Batch release credential indicates non-compliant GMP status',
+      );
     }
 
     this.logger.log(

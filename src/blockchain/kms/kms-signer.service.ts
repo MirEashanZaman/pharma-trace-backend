@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import {
   SigningKey,
   keccak256,
@@ -14,7 +19,11 @@ import {
 export interface KmsKeyMetadata {
   keyId: string;
   label: string;
-  hsmProvider: 'AWS_KMS' | 'GOOGLE_CLOUD_KMS' | 'AZURE_KEY_VAULT' | 'HASHICORP_VAULT_TRANSIT';
+  hsmProvider:
+    | 'AWS_KMS'
+    | 'GOOGLE_CLOUD_KMS'
+    | 'AZURE_KEY_VAULT'
+    | 'HASHICORP_VAULT_TRANSIT';
   fipsLevel: string;
   ethereumAddress: string;
   publicKeyHex: string;
@@ -32,7 +41,9 @@ export interface KmsSignatureResult {
   signerAddress: string;
 }
 
-const SECP256K1_N = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
+const SECP256K1_N = BigInt(
+  '0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141',
+);
 const SECP256K1_HALF_N = SECP256K1_N / 2n;
 
 @Injectable()
@@ -59,7 +70,11 @@ export class KmsSignerService {
   private initializeEnclaveKey(
     keyId: string,
     label: string,
-    hsmProvider: 'AWS_KMS' | 'GOOGLE_CLOUD_KMS' | 'AZURE_KEY_VAULT' | 'HASHICORP_VAULT_TRANSIT',
+    hsmProvider:
+      | 'AWS_KMS'
+      | 'GOOGLE_CLOUD_KMS'
+      | 'AZURE_KEY_VAULT'
+      | 'HASHICORP_VAULT_TRANSIT',
     internalSeedHex: string,
   ): void {
     const signingKey = new SigningKey(internalSeedHex);
@@ -78,13 +93,19 @@ export class KmsSignerService {
       registeredAt: Date.now(),
     });
 
-    this.logger.log(`Initialized Hardware Enclave KMS key ${keyId} -> ${ethereumAddress} (${hsmProvider})`);
+    this.logger.log(
+      `Initialized Hardware Enclave KMS key ${keyId} -> ${ethereumAddress} (${hsmProvider})`,
+    );
   }
 
   registerCustomKey(
     keyId: string,
     label: string,
-    hsmProvider: 'AWS_KMS' | 'GOOGLE_CLOUD_KMS' | 'AZURE_KEY_VAULT' | 'HASHICORP_VAULT_TRANSIT',
+    hsmProvider:
+      | 'AWS_KMS'
+      | 'GOOGLE_CLOUD_KMS'
+      | 'AZURE_KEY_VAULT'
+      | 'HASHICORP_VAULT_TRANSIT',
     seedOrKeyHex: string,
   ): KmsKeyMetadata {
     if (this.keyRegistry.has(keyId)) {
@@ -98,7 +119,9 @@ export class KmsSignerService {
   getKeyMetadata(keyId: string): KmsKeyMetadata {
     const meta = this.keyRegistry.get(keyId);
     if (!meta) {
-      throw new NotFoundException(`KMS key identifier ${keyId} not found in enclave registry`);
+      throw new NotFoundException(
+        `KMS key identifier ${keyId} not found in enclave registry`,
+      );
     }
     return meta;
   }
@@ -107,7 +130,10 @@ export class KmsSignerService {
     return Array.from(this.keyRegistry.values());
   }
 
-  updateKeyMetadata(keyId: string, updates: { label?: string; enabled?: boolean }): KmsKeyMetadata {
+  updateKeyMetadata(
+    keyId: string,
+    updates: { label?: string; enabled?: boolean },
+  ): KmsKeyMetadata {
     const meta = this.getKeyMetadata(keyId);
     if (updates.label !== undefined) {
       meta.label = updates.label;
@@ -141,7 +167,7 @@ export class KmsSignerService {
     }
     const rLength = derBuffer[offset + 1];
     let rStart = offset + 2;
-    let rEnd = rStart + rLength;
+    const rEnd = rStart + rLength;
     if (derBuffer[rStart] === 0x00 && rLength > 32) {
       rStart += 1;
     }
@@ -154,7 +180,7 @@ export class KmsSignerService {
     }
     const sLength = derBuffer[offset + 1];
     let sStart = offset + 2;
-    let sEnd = sStart + sLength;
+    const sEnd = sStart + sLength;
     if (derBuffer[sStart] === 0x00 && sLength > 32) {
       sStart += 1;
     }
@@ -174,7 +200,12 @@ export class KmsSignerService {
     return sBig;
   }
 
-  recoverV(digest: string, r: string, s: string, expectedAddress: string): number {
+  recoverV(
+    digest: string,
+    r: string,
+    s: string,
+    expectedAddress: string,
+  ): number {
     for (const vCandidate of [27, 28]) {
       try {
         const fullSig = `${r}${s.slice(2)}${toBeHex(vCandidate).slice(2)}`;
@@ -184,10 +215,15 @@ export class KmsSignerService {
         }
       } catch {}
     }
-    throw new BadRequestException('Failed to recover valid Ethereum v parameter from KMS signature');
+    throw new BadRequestException(
+      'Failed to recover valid Ethereum v parameter from KMS signature',
+    );
   }
 
-  async signDigest(keyId: string, digestHex: string): Promise<KmsSignatureResult> {
+  async signDigest(
+    keyId: string,
+    digestHex: string,
+  ): Promise<KmsSignatureResult> {
     const meta = this.getKeyMetadata(keyId);
     if (!meta.enabled) {
       throw new BadRequestException(`KMS key ${keyId} is currently disabled`);
@@ -195,12 +231,18 @@ export class KmsSignerService {
 
     const enclaveKey = this.enclaveSigners.get(keyId);
     if (!enclaveKey) {
-      throw new NotFoundException(`Enclave signer execution context for ${keyId} missing`);
+      throw new NotFoundException(
+        `Enclave signer execution context for ${keyId} missing`,
+      );
     }
 
-    const cleanDigest = digestHex.startsWith('0x') ? digestHex : '0x' + digestHex;
+    const cleanDigest = digestHex.startsWith('0x')
+      ? digestHex
+      : '0x' + digestHex;
     if (getBytes(cleanDigest).length !== 32) {
-      throw new BadRequestException('Signing digest must be precisely 32 bytes (256 bits)');
+      throw new BadRequestException(
+        'Signing digest must be precisely 32 bytes (256 bits)',
+      );
     }
 
     const signature = enclaveKey.sign(cleanDigest);
@@ -209,10 +251,17 @@ export class KmsSignerService {
     sBig = this.normalizeLowS(sBig);
     const normalizedS = toBeHex(sBig, 32);
 
-    const v = this.recoverV(cleanDigest, signature.r, normalizedS, meta.ethereumAddress);
+    const v = this.recoverV(
+      cleanDigest,
+      signature.r,
+      normalizedS,
+      meta.ethereumAddress,
+    );
     const serializedSignature = `${signature.r}${normalizedS.slice(2)}${toBeHex(v).slice(2)}`;
 
-    this.logger.log(`KMS signed digest with key ${keyId} (${meta.ethereumAddress}) -> v=${v}`);
+    this.logger.log(
+      `KMS signed digest with key ${keyId} (${meta.ethereumAddress}) -> v=${v}`,
+    );
 
     return {
       keyId,
@@ -225,12 +274,19 @@ export class KmsSignerService {
     };
   }
 
-  async signMessage(keyId: string, message: string): Promise<KmsSignatureResult> {
+  async signMessage(
+    keyId: string,
+    message: string,
+  ): Promise<KmsSignatureResult> {
     const digest = hashMessage(message);
     return this.signDigest(keyId, digest);
   }
 
-  async verifyKmsSignature(message: string, serializedSignature: string, keyId: string): Promise<boolean> {
+  async verifyKmsSignature(
+    message: string,
+    serializedSignature: string,
+    keyId: string,
+  ): Promise<boolean> {
     const meta = this.getKeyMetadata(keyId);
     const digest = hashMessage(message);
     const recovered = recoverAddress(digest, serializedSignature);

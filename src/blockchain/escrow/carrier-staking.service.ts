@@ -1,4 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException, Logger, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { isAddress, getAddress, keccak256, toUtf8Bytes } from 'ethers';
 import {
   SensorConsensusEngine,
@@ -28,10 +34,14 @@ export class CarrierStakingService {
 
   depositStake(dto: DepositStakeDto): CarrierStakeAccount {
     if (!isAddress(dto.carrierAddress)) {
-      throw new BadRequestException(`Invalid carrier Ethereum address: ${dto.carrierAddress}`);
+      throw new BadRequestException(
+        `Invalid carrier Ethereum address: ${dto.carrierAddress}`,
+      );
     }
     if (dto.amountTokens <= 0) {
-      throw new BadRequestException('Stake deposit amount must be greater than zero');
+      throw new BadRequestException(
+        'Stake deposit amount must be greater than zero',
+      );
     }
 
     const carrier = getAddress(dto.carrierAddress);
@@ -57,31 +67,41 @@ export class CarrierStakingService {
     };
 
     existing.totalStaked += dto.amountTokens;
-    existing.availableCollateral = existing.totalStaked - existing.lockedCollateral;
+    existing.availableCollateral =
+      existing.totalStaked - existing.lockedCollateral;
     existing.isAccredited = true;
     existing.lastUpdated = Date.now();
 
     this.accounts.set(carrier, existing);
-    this.logger.log(`Carrier ${carrier} deposited ${dto.amountTokens} ${symbol} collateral stake (Total: ${existing.totalStaked})`);
+    this.logger.log(
+      `Carrier ${carrier} deposited ${dto.amountTokens} ${symbol} collateral stake (Total: ${existing.totalStaked})`,
+    );
     return existing;
   }
 
   getAccount(carrierAddress: string): CarrierStakeAccount {
     if (!isAddress(carrierAddress)) {
-      throw new BadRequestException(`Invalid carrier address: ${carrierAddress}`);
+      throw new BadRequestException(
+        `Invalid carrier address: ${carrierAddress}`,
+      );
     }
     const carrier = getAddress(carrierAddress);
     const account = this.accounts.get(carrier);
     if (!account) {
-      throw new NotFoundException(`No staking account found for carrier ${carrier}`);
+      throw new NotFoundException(
+        `No staking account found for carrier ${carrier}`,
+      );
     }
-    account.availableCollateral = account.totalStaked - account.lockedCollateral;
+    account.availableCollateral =
+      account.totalStaked - account.lockedCollateral;
     return account;
   }
 
   lockShipmentBond(dto: LockBondDto): ShipmentBond {
     if (!isAddress(dto.carrierAddress) || !isAddress(dto.manufacturerAddress)) {
-      throw new BadRequestException('Carrier and manufacturer must be valid Ethereum addresses');
+      throw new BadRequestException(
+        'Carrier and manufacturer must be valid Ethereum addresses',
+      );
     }
     if (dto.bondAmount <= 0) {
       throw new BadRequestException('Bond amount must be greater than zero');
@@ -92,7 +112,9 @@ export class CarrierStakingService {
     const account = this.getAccount(carrier);
 
     if (!account.isAccredited) {
-      throw new BadRequestException(`Carrier ${carrier} is not accredited for cold-chain shipments`);
+      throw new BadRequestException(
+        `Carrier ${carrier} is not accredited for cold-chain shipments`,
+      );
     }
 
     if (account.availableCollateral < dto.bondAmount) {
@@ -102,21 +124,34 @@ export class CarrierStakingService {
     }
 
     if (this.bonds.has(dto.shipmentId)) {
-      throw new BadRequestException(`Bond already exists for shipment ${dto.shipmentId}`);
+      throw new BadRequestException(
+        `Bond already exists for shipment ${dto.shipmentId}`,
+      );
     }
 
     account.lockedCollateral += dto.bondAmount;
-    account.availableCollateral = account.totalStaked - account.lockedCollateral;
+    account.availableCollateral =
+      account.totalStaked - account.lockedCollateral;
     account.lastUpdated = Date.now();
 
     const contract = this.blockchainService?.getCarrierStakingContract();
     if (contract) {
-      const shipmentBytes32 = dto.shipmentId.startsWith('0x') && dto.shipmentId.length === 66
-        ? dto.shipmentId
-        : keccak256(toUtf8Bytes(dto.shipmentId));
-      contract.lockShipmentBond(shipmentBytes32, carrier, manufacturer, dto.bondAmount).catch((err: any) => {
-        this.logger.warn(`On-chain lock shipment bond failed: ${err.message}`);
-      });
+      const shipmentBytes32 =
+        dto.shipmentId.startsWith('0x') && dto.shipmentId.length === 66
+          ? dto.shipmentId
+          : keccak256(toUtf8Bytes(dto.shipmentId));
+      contract
+        .lockShipmentBond(
+          shipmentBytes32,
+          carrier,
+          manufacturer,
+          dto.bondAmount,
+        )
+        .catch((err: any) => {
+          this.logger.warn(
+            `On-chain lock shipment bond failed: ${err.message}`,
+          );
+        });
     }
 
     const bond: ShipmentBond = {
@@ -132,19 +167,27 @@ export class CarrierStakingService {
     };
 
     this.bonds.set(dto.shipmentId, bond);
-    this.logger.log(`Locked ${dto.bondAmount} collateral bond for carrier ${carrier} on shipment ${dto.shipmentId}`);
+    this.logger.log(
+      `Locked ${dto.bondAmount} collateral bond for carrier ${carrier} on shipment ${dto.shipmentId}`,
+    );
     return bond;
   }
 
   getBond(shipmentId: string): ShipmentBond {
     const bond = this.bonds.get(shipmentId);
     if (!bond) {
-      throw new NotFoundException(`No shipment bond found for id ${shipmentId}`);
+      throw new NotFoundException(
+        `No shipment bond found for id ${shipmentId}`,
+      );
     }
     return bond;
   }
 
-  listBonds(query?: { carrierAddress?: string; status?: string; limit?: number }): ShipmentBond[] {
+  listBonds(query?: {
+    carrierAddress?: string;
+    status?: string;
+    limit?: number;
+  }): ShipmentBond[] {
     let result = Array.from(this.bonds.values());
     if (query?.carrierAddress && isAddress(query.carrierAddress)) {
       const normalized = getAddress(query.carrierAddress);
@@ -159,14 +202,20 @@ export class CarrierStakingService {
     return result;
   }
 
-  cancelBond(shipmentId: string, reason: string = 'Shipment cancelled prior to departure'): ShipmentBond {
+  cancelBond(
+    shipmentId: string,
+    reason: string = 'Shipment cancelled prior to departure',
+  ): ShipmentBond {
     const bond = this.getBond(shipmentId);
     if (bond.status !== 'LOCKED') {
-      throw new BadRequestException(`Cannot cancel bond with status ${bond.status}`);
+      throw new BadRequestException(
+        `Cannot cancel bond with status ${bond.status}`,
+      );
     }
     const carrier = this.getAccount(bond.carrierAddress);
     carrier.lockedCollateral -= bond.bondAmount;
-    carrier.availableCollateral = carrier.totalStaked - carrier.lockedCollateral;
+    carrier.availableCollateral =
+      carrier.totalStaked - carrier.lockedCollateral;
     carrier.lastUpdated = Date.now();
 
     bond.status = 'CANCELLED' as any;
@@ -182,7 +231,9 @@ export class CarrierStakingService {
   ): CarrierBondResolution {
     const bond = this.getBond(shipmentId);
     if (bond.status !== 'LOCKED') {
-      throw new BadRequestException(`Bond ${shipmentId} is already resolved with status ${bond.status}`);
+      throw new BadRequestException(
+        `Bond ${shipmentId} is already resolved with status ${bond.status}`,
+      );
     }
 
     const carrier = this.getAccount(bond.carrierAddress);
@@ -198,14 +249,16 @@ export class CarrierStakingService {
 
     if (consensusReport.isSettlementApproved) {
       carrier.lockedCollateral -= bond.bondAmount;
-      carrier.availableCollateral = carrier.totalStaked - carrier.lockedCollateral;
+      carrier.availableCollateral =
+        carrier.totalStaked - carrier.lockedCollateral;
       carrier.lastUpdated = Date.now();
 
       const contract = this.blockchainService?.getCarrierStakingContract();
       if (contract) {
-        const shipmentBytes32 = shipmentId.startsWith('0x') && shipmentId.length === 66
-          ? shipmentId
-          : keccak256(toUtf8Bytes(shipmentId));
+        const shipmentBytes32 =
+          shipmentId.startsWith('0x') && shipmentId.length === 66
+            ? shipmentId
+            : keccak256(toUtf8Bytes(shipmentId));
         contract.releaseShipmentBond(shipmentBytes32).catch((err: any) => {
           this.logger.warn(`On-chain release bond failed: ${err.message}`);
         });
@@ -214,10 +267,13 @@ export class CarrierStakingService {
       bond.status = 'RELEASED';
       bond.slashedAmount = 0;
       bond.resolvedAt = Date.now();
-      bond.resolutionReason = 'Multi-sensor consensus verified compliant cold-chain handover';
+      bond.resolutionReason =
+        'Multi-sensor consensus verified compliant cold-chain handover';
       bond.consensusReportHash = reportHash;
 
-      this.logger.log(`Released ${bond.bondAmount} bond for carrier ${bond.carrierAddress} on shipment ${shipmentId}`);
+      this.logger.log(
+        `Released ${bond.bondAmount} bond for carrier ${bond.carrierAddress} on shipment ${shipmentId}`,
+      );
 
       return {
         shipmentId,
@@ -236,24 +292,32 @@ export class CarrierStakingService {
 
     carrier.lockedCollateral -= bond.bondAmount;
     carrier.totalStaked -= slashedAmount;
-    carrier.availableCollateral = carrier.totalStaked - carrier.lockedCollateral;
+    carrier.availableCollateral =
+      carrier.totalStaked - carrier.lockedCollateral;
     carrier.totalSlashed += slashedAmount;
     carrier.totalIndemnified += slashedAmount;
     carrier.lastUpdated = Date.now();
 
-    const currentIndemnity = this.indemnityLedger.get(bond.manufacturerAddress) || 0;
-    this.indemnityLedger.set(bond.manufacturerAddress, currentIndemnity + slashedAmount);
+    const currentIndemnity =
+      this.indemnityLedger.get(bond.manufacturerAddress) || 0;
+    this.indemnityLedger.set(
+      bond.manufacturerAddress,
+      currentIndemnity + slashedAmount,
+    );
 
     const reason = `Autonomous bond slashing: multi-sensor consensus rejected cold-chain telemetry. Excursions: ${consensusReport.excursionCheckpoints}`;
 
     const contract = this.blockchainService?.getCarrierStakingContract();
     if (contract) {
-      const shipmentBytes32 = shipmentId.startsWith('0x') && shipmentId.length === 66
-        ? shipmentId
-        : keccak256(toUtf8Bytes(shipmentId));
-      contract.slashShipmentBond(shipmentBytes32, slashPct, reason, reportHash).catch((err: any) => {
-        this.logger.warn(`On-chain slash bond failed: ${err.message}`);
-      });
+      const shipmentBytes32 =
+        shipmentId.startsWith('0x') && shipmentId.length === 66
+          ? shipmentId
+          : keccak256(toUtf8Bytes(shipmentId));
+      contract
+        .slashShipmentBond(shipmentBytes32, slashPct, reason, reportHash)
+        .catch((err: any) => {
+          this.logger.warn(`On-chain slash bond failed: ${err.message}`);
+        });
     }
 
     bond.status = 'SLASHED';
@@ -291,7 +355,8 @@ export class CarrierStakingService {
     }
 
     carrier.totalStaked -= dto.amountTokens;
-    carrier.availableCollateral = carrier.totalStaked - carrier.lockedCollateral;
+    carrier.availableCollateral =
+      carrier.totalStaked - carrier.lockedCollateral;
     if (carrier.totalStaked === 0) {
       carrier.isAccredited = false;
     }
@@ -304,13 +369,17 @@ export class CarrierStakingService {
       });
     }
 
-    this.logger.log(`Carrier ${carrier.carrierAddress} unstaked ${dto.amountTokens} collateral. Remaining: ${carrier.totalStaked}`);
+    this.logger.log(
+      `Carrier ${carrier.carrierAddress} unstaked ${dto.amountTokens} collateral. Remaining: ${carrier.totalStaked}`,
+    );
     return carrier;
   }
 
   getManufacturerIndemnity(manufacturerAddress: string): number {
     if (!isAddress(manufacturerAddress)) {
-      throw new BadRequestException(`Invalid manufacturer address: ${manufacturerAddress}`);
+      throw new BadRequestException(
+        `Invalid manufacturer address: ${manufacturerAddress}`,
+      );
     }
     return this.indemnityLedger.get(getAddress(manufacturerAddress)) || 0;
   }

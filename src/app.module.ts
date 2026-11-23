@@ -34,8 +34,11 @@ import { HealthModule } from './health/health.module';
       password: process.env.DB_PASSWORD || '12345',
       database: process.env.DB_DATABASE || 'pharma_trace',
       autoLoadEntities: true,
-      synchronize: process.env.NODE_ENV !== 'production' && process.env.DB_SYNCHRONIZE !== 'false',
-      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      synchronize:
+        process.env.NODE_ENV !== 'production' &&
+        process.env.DB_SYNCHRONIZE !== 'false',
+      ssl:
+        process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     }),
 
     RedisModule,
@@ -50,9 +53,7 @@ import { HealthModule } from './health/health.module';
     HealthModule,
   ],
 
-  controllers: [
-    AppController,
-  ],
+  controllers: [AppController],
 
   providers: [
     AppService,

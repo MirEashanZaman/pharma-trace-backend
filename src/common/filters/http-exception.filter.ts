@@ -38,21 +38,35 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const driverError = (exception as any).driverError;
       if (driverError?.code === '23505') {
         status = HttpStatus.CONFLICT;
-        message = 'A conflicting record with this identifier already exists in the system';
+        message =
+          'A conflicting record with this identifier already exists in the system';
       } else if (driverError?.code === '23503') {
-        message = 'Referenced entity does not exist or is constrained by foreign key dependencies';
+        message =
+          'Referenced entity does not exist or is constrained by foreign key dependencies';
       } else {
-        message = 'Database constraint check failed for the submitted transaction';
+        message =
+          'Database constraint check failed for the submitted transaction';
       }
-      this.logger.error(`Database Exception [${request.method} ${request.url}]: ${exception.message}`);
+      this.logger.error(
+        `Database Exception [${request.method} ${request.url}]: ${exception.message}`,
+      );
     } else if (exception instanceof TypeORMError) {
       status = HttpStatus.UNPROCESSABLE_ENTITY;
       error = 'Data Mapping Error';
-      message = 'Invalid entity query or parameters encountered during transaction execution';
-      this.logger.error(`TypeORM Exception [${request.method} ${request.url}]: ${exception.message}`);
+      message =
+        'Invalid entity query or parameters encountered during transaction execution';
+      this.logger.error(
+        `TypeORM Exception [${request.method} ${request.url}]: ${exception.message}`,
+      );
     } else if (exception instanceof Error) {
-      this.logger.error(`Unhandled Exception [${request.method} ${request.url}]: ${exception.message}`, exception.stack);
-      message = process.env.NODE_ENV === 'production' ? 'Internal server error occurred' : exception.message;
+      this.logger.error(
+        `Unhandled Exception [${request.method} ${request.url}]: ${exception.message}`,
+        exception.stack,
+      );
+      message =
+        process.env.NODE_ENV === 'production'
+          ? 'Internal server error occurred'
+          : exception.message;
     }
 
     const errorPayload = {
@@ -68,4 +82,3 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json(errorPayload);
   }
 }
-

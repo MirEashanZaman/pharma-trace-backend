@@ -83,12 +83,13 @@ describe("PharmaPaymaster Contract", function () {
 
     beforeEach(async function () {
       const block = await ethers.provider.getBlock("latest");
+      const { chainId } = await ethers.provider.getNetwork();
       validAfter = block.timestamp - 10;
       validUntil = block.timestamp + 3600;
 
       const messageHash = ethers.solidityPackedKeccak256(
-        ["address", "uint48", "uint48", "address", "bytes32"],
-        [await paymaster.getAddress(), validUntil, validAfter, user.address, sampleUserOpHash]
+        ["uint256", "address", "uint48", "uint48", "address", "bytes32"],
+        [chainId, await paymaster.getAddress(), validUntil, validAfter, user.address, sampleUserOpHash]
       );
 
       signature = await paymasterSigner.signMessage(ethers.getBytes(messageHash));
@@ -107,9 +108,10 @@ describe("PharmaPaymaster Contract", function () {
     });
 
     it("should reject validation when signature originates from unauthorized signer", async function () {
+      const { chainId } = await ethers.provider.getNetwork();
       const messageHash = ethers.solidityPackedKeccak256(
-        ["address", "uint48", "uint48", "address", "bytes32"],
-        [await paymaster.getAddress(), validUntil, validAfter, user.address, sampleUserOpHash]
+        ["uint256", "address", "uint48", "uint48", "address", "bytes32"],
+        [chainId, await paymaster.getAddress(), validUntil, validAfter, user.address, sampleUserOpHash]
       );
       const forgedSignature = await unauthorized.signMessage(ethers.getBytes(messageHash));
 

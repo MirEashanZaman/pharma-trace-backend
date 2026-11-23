@@ -16,7 +16,9 @@ describe('AppController', () => {
 
   describe('root', () => {
     it('should return gateway status', () => {
-      expect(appController.getHello()).toBe('PharmaTrace Enterprise API Gateway Active');
+      expect(appController.getHello()).toBe(
+        'PharmaTrace Enterprise API Gateway Active',
+      );
     });
   });
 });

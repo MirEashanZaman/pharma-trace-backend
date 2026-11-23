@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { getAddress, isAddress, verifyMessage } from 'ethers';
 
 export interface VerificationMethod {
@@ -66,7 +71,9 @@ export class DidResolverService {
     roles: string[],
   ): W3cDidDocument {
     if (!isAddress(ethereumAddress)) {
-      throw new BadRequestException('Invalid Ethereum address for DID controller');
+      throw new BadRequestException(
+        'Invalid Ethereum address for DID controller',
+      );
     }
 
     const checksumAddress = getAddress(ethereumAddress);
@@ -107,7 +114,9 @@ export class DidResolverService {
     };
 
     this.didDirectory.set(did.toLowerCase(), didDoc);
-    this.logger.log(`Registered W3C DID document for ${did} (${entityName}, GLN: ${gln})`);
+    this.logger.log(
+      `Registered W3C DID document for ${did} (${entityName}, GLN: ${gln})`,
+    );
     return didDoc;
   }
 

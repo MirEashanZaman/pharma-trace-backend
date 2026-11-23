@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ethers, HDNodeWallet, Wallet } from 'ethers';
 
 export enum AccreditationType {
@@ -88,7 +92,9 @@ export class SoulboundAccreditationService {
       dto.metadataCid,
     );
 
-    const signature = await issuerSigner.signMessage(ethers.getBytes(messageHash));
+    const signature = await issuerSigner.signMessage(
+      ethers.getBytes(messageHash),
+    );
 
     const badge: SoulboundBadge = {
       tokenId,
@@ -108,14 +114,20 @@ export class SoulboundAccreditationService {
     return badge;
   }
 
-  async verifyBadge(tokenId: string): Promise<{ valid: boolean; reason?: string; badge?: SoulboundBadge }> {
+  async verifyBadge(
+    tokenId: string,
+  ): Promise<{ valid: boolean; reason?: string; badge?: SoulboundBadge }> {
     const badge = this.registry.get(tokenId);
     if (!badge) {
       return { valid: false, reason: 'Badge does not exist' };
     }
 
     if (badge.revoked) {
-      return { valid: false, reason: `Accreditation revoked: ${badge.revocationReason}`, badge };
+      return {
+        valid: false,
+        reason: `Accreditation revoked: ${badge.revocationReason}`,
+        badge,
+      };
     }
 
     const now = Math.floor(Date.now() / 1000);
@@ -135,9 +147,16 @@ export class SoulboundAccreditationService {
     );
 
     try {
-      const recoveredSigner = ethers.verifyMessage(ethers.getBytes(messageHash), badge.signature);
+      const recoveredSigner = ethers.verifyMessage(
+        ethers.getBytes(messageHash),
+        badge.signature,
+      );
       if (recoveredSigner.toLowerCase() !== badge.issuer.toLowerCase()) {
-        return { valid: false, reason: 'Cryptographic signature mismatch', badge };
+        return {
+          valid: false,
+          reason: 'Cryptographic signature mismatch',
+          badge,
+        };
       }
     } catch {
       return { valid: false, reason: 'Invalid signature structure', badge };
@@ -158,7 +177,9 @@ export class SoulboundAccreditationService {
 
     const signerAddress = await issuerSigner.getAddress();
     if (signerAddress.toLowerCase() !== badge.issuer.toLowerCase()) {
-      throw new BadRequestException('Only the issuing regulatory body can revoke this accreditation');
+      throw new BadRequestException(
+        'Only the issuing regulatory body can revoke this accreditation',
+      );
     }
 
     badge.revoked = true;
@@ -178,7 +199,10 @@ export class SoulboundAccreditationService {
     return badges;
   }
 
-  async hasValidAccreditation(recipient: string, type: AccreditationType): Promise<boolean> {
+  async hasValidAccreditation(
+    recipient: string,
+    type: AccreditationType,
+  ): Promise<boolean> {
     const badges = this.getBadgesForHolder(recipient);
     for (const badge of badges) {
       if (badge.accreditationType === type) {
@@ -203,8 +227,26 @@ export class SoulboundAccreditationService {
   ): string {
     return ethers.keccak256(
       ethers.solidityPacked(
-        ['bytes32', 'address', 'address', 'string', 'string', 'uint256', 'uint256', 'string'],
-        [tokenId, recipient, issuer, accreditationType, jurisdiction, issuedAt, validUntil, metadataCid],
+        [
+          'bytes32',
+          'address',
+          'address',
+          'string',
+          'string',
+          'uint256',
+          'uint256',
+          'string',
+        ],
+        [
+          tokenId,
+          recipient,
+          issuer,
+          accreditationType,
+          jurisdiction,
+          issuedAt,
+          validUntil,
+          metadataCid,
+        ],
       ),
     );
   }

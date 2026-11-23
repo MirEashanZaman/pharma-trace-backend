@@ -4,15 +4,15 @@ import { EventObserver } from '../observers/event.observer';
 
 @Injectable()
 export class EventPublisher {
-    private observers: EventObserver[] = [];
+  private observers: EventObserver[] = [];
 
-    subscribe(observer: EventObserver): void {
-        this.observers.push(observer);
-    }
+  subscribe(observer: EventObserver): void {
+    this.observers.push(observer);
+  }
 
-    publish(event: DrugEvent): void {
-        for (const observer of this.observers) {
-            observer.update(event);
-        }
+  publish(event: DrugEvent): void {
+    for (const observer of this.observers) {
+      observer.update(event);
     }
+  }
 }

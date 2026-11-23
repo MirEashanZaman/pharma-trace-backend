@@ -1,4 +1,8 @@
-import { IComplianceRule, ComplianceData, RuleEvaluationResult } from '../compliance.types';
+import {
+  IComplianceRule,
+  ComplianceData,
+  RuleEvaluationResult,
+} from '../compliance.types';
 
 export class FdaDscsaRule implements IComplianceRule {
   readonly ruleId = 'FDA_DSCSA_TITLE_II';
@@ -6,7 +10,9 @@ export class FdaDscsaRule implements IComplianceRule {
 
   evaluate(data: ComplianceData): RuleEvaluationResult {
     const isGtinValid = /^\d{14}$/.test(data.gtin);
-    const hasSerial = Boolean(data.serialNumber && data.serialNumber.trim().length > 0);
+    const hasSerial = Boolean(
+      data.serialNumber && data.serialNumber.trim().length > 0,
+    );
     const isNotExpired = new Date(data.expiryDate).getTime() > Date.now();
 
     const passed = isGtinValid && hasSerial && isNotExpired;
@@ -31,7 +37,9 @@ export class EuFmdRule implements IComplianceRule {
 
   evaluate(data: ComplianceData): RuleEvaluationResult {
     const hasTamperProtection = data.tamperSealIntact === true;
-    const hasSerial = Boolean(data.serialNumber && data.serialNumber.trim().length > 0);
+    const hasSerial = Boolean(
+      data.serialNumber && data.serialNumber.trim().length > 0,
+    );
     const passed = hasTamperProtection && hasSerial;
 
     const message = passed
@@ -78,7 +86,11 @@ export class WhoColdChainRule implements IComplianceRule {
       passed,
       message,
       timestamp: new Date().toISOString(),
-      details: { minRecorded: min, maxRecorded: max, readingCount: data.temperatures.length },
+      details: {
+        minRecorded: min,
+        maxRecorded: max,
+        readingCount: data.temperatures.length,
+      },
     };
   }
 }
@@ -88,8 +100,12 @@ export class HealthCanadaRule implements IComplianceRule {
   readonly authority = 'Health Canada';
 
   evaluate(data: ComplianceData): RuleEvaluationResult {
-    const hasBatch = Boolean(data.batchNumber && data.batchNumber.trim().length > 0);
-    const hasTemperatures = Boolean(data.temperatures && data.temperatures.length > 0);
+    const hasBatch = Boolean(
+      data.batchNumber && data.batchNumber.trim().length > 0,
+    );
+    const hasTemperatures = Boolean(
+      data.temperatures && data.temperatures.length > 0,
+    );
     const passed = hasBatch && hasTemperatures;
 
     return {

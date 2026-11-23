@@ -40,13 +40,21 @@ export interface ISerializedTracker {
 }
 
 export interface IColdChainAuditor {
-  evaluateExcursions(readings: number[], minTemp: number, maxTemp: number): boolean;
+  evaluateExcursions(
+    readings: number[],
+    minTemp: number,
+    maxTemp: number,
+  ): boolean;
   calculateMeanKineticTemperature(readings: number[]): number;
 }
 
 export interface ICustodySigner {
   signTransferOffer(orderId: string, recipient: string): string;
-  verifyTransferAcceptance(orderId: string, signature: string, signerAddress: string): boolean;
+  verifyTransferAcceptance(
+    orderId: string,
+    signature: string,
+    signerAddress: string,
+  ): boolean;
 }
 
 export interface ICollateralStakeholder {

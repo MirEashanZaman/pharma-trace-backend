@@ -10,4 +10,4 @@ import { DrugsService } from './drugs.service';
   controllers: [DrugsController],
   providers: [DrugsService],
 })
-export class DrugsModule { }
+export class DrugsModule {}
